@@ -2328,8 +2328,6 @@ subroutine calculate_raintag(wvt_ratio,xstart,xend,ystart,yend,CL_CC, RAINBL, RA
   if (wvt_ratio .lt. 0.5) return
   do jj = ystart,yend
     do ii = xstart,xend
-      if (DOMAIN_MASK(ii,jj) .eq. 0.) cycle
-      if (MCS_MASK(ii,jj) .lt. 0.5) cycle
       RAINBL_TR(ii,jj) = RAINBL(ii,jj)*wvt_ratio*CL_CC(ii,jj)
       ACRAINBL_TR(ii,jj) = ACRAINBL_TR(ii,jj) + RAINBL_TR(ii,jj)
     end do
