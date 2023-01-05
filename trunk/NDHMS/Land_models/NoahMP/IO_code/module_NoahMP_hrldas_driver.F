@@ -303,6 +303,9 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  FLUXXY_TR    ! tracer flux at soil bottom [m]
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  SMOIS_SUB    ! volumetric soil moisture in sublayers [m3/m3]
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  SH2OXY_SUB     ! volumetric liquid soil moisture in sublayers [m3/m3]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  CL_CC        !chloride concentration [10^-3 m3/m3]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RAINBL_TR    ! "tagged" precip(or chloride) at each time step (mm) 
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  ACRAINBL_TR  ! accumulated "tagged" precip (mm)
   !------namelist variables----------------
   integer                                 :: water_tracer_option ! 0-water tracer off, 1-water tracer on
   character(len=256)                      :: track_start   ! YYYY-MM-DD
@@ -1110,6 +1113,9 @@ if (OPT_WT .eq. 1) then
   ALLOCATE ( FLUXXY_TR     (XSTART:XEND,1:NTRACER,YSTART:YEND) )     ! tracer flux at soil bottom [m]
   ALLOCATE ( SMOIS_SUB     (XSTART:XEND,1:NTRACER,YSTART:YEND) )     ! volumetric soil moisture in sublayers [m3/m3]
   ALLOCATE ( SH2OXY_SUB    (XSTART:XEND,1:NTRACER,YSTART:YEND) )     ! volumetric liquid soil moisture in sublayers [m3/m3]
+  ALLOCATE ( CL_CC        (XSTART:XEND,YSTART:YEND) )  ! chloride concentration [10-3 m3/m3]
+  ALLOCATE ( RAINBL_TR    (XSTART:XEND,YSTART:YEND) )  ! "tagged" precip at each time step [mm]
+  ALLOCATE ( ACRAINBL_TR  (XSTART:XEND,YSTART:YEND) )  ! accumulated "tagged" precip [mm]
 end if
 
 !------------------------------------------------------------------------
@@ -1351,6 +1357,9 @@ if (OPT_WT .eq. 1) then
   FLUXXY_TR     = undefined_real
   SMOIS_SUB      = undefined_real
   SH2OXY_SUB     = undefined_real
+  CL_CC          = undefined_real    !Huancui
+  RAINBL_TR      = undefined_real
+  ACRAINBL_TR    = 0.0
 end if
 print *, "FLAG2"
 print *, "NTRACER", NTRACER
@@ -1880,7 +1889,7 @@ end subroutine land_driver_ini
         CALL READFORC_HRLDAS(INFLNM_TEMPLATE, FORCING_TIMESTEP, OLDDATE,  &
              XSTART, XEND, YSTART, YEND,                                  &
              T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),          &
-	       P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, VEGFRA, update_veg, LAI, update_lai)
+	       P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, VEGFRA, update_veg, LAI, update_lai, CL_CC)
      else
         if(olddate == forcDate) then
            CALL HYDRO_frocing_drv(trim(indir), forc_typ,snow_assim,olddate,                      &
@@ -1899,7 +1908,7 @@ end subroutine land_driver_ini
      CALL READFORC_HRLDAS(INFLNM_TEMPLATE, FORCING_TIMESTEP, OLDDATE,  &
           XSTART, XEND, YSTART, YEND,                                  &
           T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),          &
-	    P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, VEGFRA, update_veg, LAI, update_lai)
+	    P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, VEGFRA, update_veg, LAI, update_lai, CL_CC)
 #endif
 !------water tracer variables initiation-------
 if (OPT_WT .eq. 1) then 
@@ -2060,6 +2069,8 @@ print *, "NTRACER", NTRACER
       else
         wvt_ratio = 0.0
       end if
+      call calculate_raintag(wvt_ratio, XSTART, XEND, YSTART, YEND, &
+           CL_CC, RAINBL, RAINBL_TR, ACRAINBL_TR) !update "tagged" precip (chloride)
     end if
 
 print *, "FLAG6"
@@ -2170,7 +2181,8 @@ print *, "NTRACER", NTRACER
                 , ACCPRCP=ACCPRCP,  ACCECAN=ACCECAN, ACCETRAN=ACCETRAN,  ACCEDIR=ACCEDIR  &
                 , SOILSAT_TOP=SOILSAT_TOP, SOILSAT=SOILSAT, SOILICE=SOILICE, SNOWT_AVG=SNOWT_AVG      &
 #endif
-                , NTRACER=NTRACER, wvtflag=wvtflag, iopt_pm=iopt_pm, wvt_ratio=wvt_ratio, NSUB=NSUB           & ! IN WVT
+                , NTRACER=NTRACER, CL_CC=CL_CC                & ! IN WVT & Chloride
+                , wvtflag=wvtflag, iopt_pm=iopt_pm, wvt_ratio=wvt_ratio, NSUB=NSUB           & ! IN WVT
 		, SMOIS_SUB=SMOIS_SUB, SH2OXY_SUB=SH2OXY_SUB                                              & ! IN WVT
                 , QFX_TR=QFX_TR, LH_TR=LH_TR, SFCRUNOFF_TR=SFCRUNOFF_TR, UDRUNOFF_TR=UDRUNOFF_TR      & !IN/OUT WVT
 		, SMOIS_TR=SMOIS_TR, SH2OXY_TR=SH2OXY_TR, SNOWXY_TR=SNOWXY_TR, SNOWHXY_TR=SNOWHXY_TR, CANWAT_TR=CANWAT_TR &
@@ -2300,6 +2312,32 @@ print *, "NTRACER", NTRACER
 !print *, "FLAG10,SFCRUNOFF(28,22):",SFCRUNOFF(28,22)
 
 end subroutine land_driver_exe
+
+!!===============================================================================
+subroutine calculate_raintag(wvt_ratio,xstart,xend,ystart,yend,CL_CC, RAINBL, RAINBL_TR, ACRAINBL_TR)
+  implicit none
+  real,                                     intent(in)   :: wvt_ratio
+  integer,                                  intent(in)   :: xstart,xend,ystart,yend
+  real, dimension(xstart:xend,ystart:yend), intent(in)   :: CL_CC
+  real, dimension(xstart:xend,ystart:yend), intent(in)   :: RAINBL
+  real, dimension(xstart:xend,ystart:yend), intent(out)  :: RAINBL_TR
+  real, dimension(xstart:xend,ystart:yend), intent(inout):: ACRAINBL_TR
+  integer                                                :: ii,jj
+
+  RAINBL_TR = 0.0
+  if (wvt_ratio .lt. 0.5) return
+  do jj = ystart,yend
+    do ii = xstart,xend
+      if (DOMAIN_MASK(ii,jj) .eq. 0.) cycle
+      if (MCS_MASK(ii,jj) .lt. 0.5) cycle
+      RAINBL_TR(ii,jj) = RAINBL(ii,jj)*wvt_ratio*CL_CC(ii,jj)
+      ACRAINBL_TR(ii,jj) = ACRAINBL_TR(ii,jj) + RAINBL_TR(ii,jj)
+    end do
+  end do
+
+end subroutine calculate_raintag
+!!===============================================================================
+
 
 !!===============================================================================
 subroutine  ldas_output(itime, wvtflag)
@@ -2566,6 +2604,8 @@ print *, "LH_TR, LH:", LH_TR(0,0),LH(0,0)
      call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QSNOWXY_TR,IVGTYP,115)
      call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOW_TR,IVGTYP,116)
      call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOM_TR,IVGTYP,117)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,RAINBL_TR,IVGTYP,118)   !Huancui
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACRAINBL_TR,IVGTYP,119)   !Huancui
    end if
    
 #endif /* WRF_HYDRO */
