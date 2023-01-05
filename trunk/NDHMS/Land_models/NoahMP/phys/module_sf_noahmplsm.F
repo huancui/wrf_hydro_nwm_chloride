@@ -374,6 +374,7 @@ contains
                    , ECAN_TR, ETRAN_TR, EDIR_TR,  FCEV_TR, FCTR_TR, FGEV_TR        & ! OUT
                    , RUNSRF_TR, RUNSUB_TR, QSNBOT_TR, PONDING_TR, PONDING1_TR         & ! OUT
                    , PONDING2_TR, FLUX_TR                       & ! OUT
+                   , CL_CC_PASS                                 & ! IN CHLORIDE
 #ifdef WRF_HYDRO
                    , SFCHEADRT_TR_PASS                          & ! INOUT
 #endif
@@ -549,6 +550,7 @@ contains
   REAL                           , OPTIONAL, INTENT(OUT)   :: PONDING1_TR!surface ponding [mm]
   REAL                           , OPTIONAL, INTENT(OUT)   :: PONDING2_TR!surface ponding [mm]
   REAL, DIMENSION(     1:NTRACER), OPTIONAL, INTENT(OUT)   :: FLUX_TR    ! tracer flux at bottom of soil layer [m]
+  REAL                           , OPTIONAL, INTENT(IN)    :: CL_CC_PASS ! chloride concentration [10-3m3/m3]
   !--------LOCAL VARIABLES---------------------------------------------
   REAL                                                     :: CMC_TR    !intercepted water(CANICE+CANLIQ) (mm)
   REAL, DIMENSION(-NSNOW+1:NTRACER)                        :: DZSNSO_TR !snow/soil layer thickness [m]
@@ -702,8 +704,8 @@ contains
 !-----tag precip as water tracer------
 !print *, "FLAG0003"
    if (present(wvt_ratio)) then
-     call tag_precip(RAIN, wvt_ratio, RAIN_TR)
-     call tag_precip(SNOW, wvt_ratio, SNOW_TR)
+     call tag_precip(RAIN, wvt_ratio*CL_CC_PASS, RAIN_TR)
+     call tag_precip(SNOW, wvt_ratio*CL_CC_PASS, SNOW_TR)
    end if
 
 !print *, "FLAG0004"
@@ -774,7 +776,8 @@ contains
 		     , CANLIQ_TR=CANLIQ_TR, CANICE_TR=CANICE_TR       & !wt inout
 		     , QRAIN_TR=QRAIN_TR, QSNOW_TR=QSNOW_TR           & !wt out
 		     , SNOWHIN_TR=SNOWHIN_TR, CMC_TR=CMC_TR           & !out
-		     )   !out
+	             , CL_CC_PASS=CL_CC_PASS                          & !in chloride
+                      )   !out
 !print *, "FLAG0007"  
   else 
 !print *, "FLAG0008"
@@ -1262,6 +1265,7 @@ end if
 			  , WVTFLAG, WVT_RATIO                             & !wt in
 			  , CANLIQ_TR, CANICE_TR                           & !wt inout
                           , QRAIN_TR, QSNOW_TR, SNOWHIN_TR, CMC_TR         & !wt out
+                          , CL_CC_PASS                                     & !in chloride
 			  )   !out
 
 ! ------------------------ code history ------------------------------
@@ -1322,6 +1326,7 @@ end if
   REAL, OPTIONAL, INTENT(OUT)   :: QSNOW_TR   !snow at ground srf (mm/s) [+]
   REAL, OPTIONAL, INTENT(OUT)   :: SNOWHIN_TR !snow depth increasing rate (m/s)
   REAL, OPTIONAL, INTENT(OUT)   :: CMC_TR     !intercepted water (mm)
+  REAL, OPTIONAL, INTENT(IN)    :: CL_CC_PASS !chloride concentration (10-3m3/m3)
   REAL                          :: QINTR_TR   !interception rate for rain (mm/s)
   REAL                          :: QDRIPR_TR  !drip rate for rain (mm/s)
   REAL                          :: QTHROR_TR  !throughfall for rain (mm/s)
@@ -1397,9 +1402,9 @@ end if
          QTHROR = (1.-FVEG) * RAIN
          CANLIQ=MAX(0.,CANLIQ+QINTR*DT)
 	 ! do tracer calculation---------
-	 if (present(WVTFLAG)) call tag_precip(QINTR, WVT_RATIO, QINTR_TR)
-	 if (present(WVTFLAG)) call tag_precip(QDRIPR, WVT_RATIO, QDRIPR_TR)
-	 if (present(WVTFLAG)) call tag_precip(QTHROR, WVT_RATIO, QTHROR_TR)
+	 if (present(WVTFLAG)) call tag_precip(QINTR, WVT_RATIO*CL_CC_PASS, QINTR_TR)
+	 if (present(WVTFLAG)) call tag_precip(QDRIPR, WVT_RATIO*CL_CC_PASS, QDRIPR_TR)
+	 if (present(WVTFLAG)) call tag_precip(QTHROR, WVT_RATIO*CL_CC_PASS, QTHROR_TR)
 	 if (present(WVTFLAG)) CANLIQ_TR = MAX(0.0, CANLIQ_TR+QINTR_TR*DT)
 	 !-------------------------------
       ELSE
@@ -1447,10 +1452,10 @@ end if
          QTHROS = (1.0-FVEG) * SNOW
          CANICE= MAX(0.,CANICE + (QINTS - ICEDRIP)*DT)
 	 if (present(WVTFLAG)) then     !wt calc
-	   call tag_precip(QINTS, WVT_RATIO, QINTS_TR)
+	   call tag_precip(QINTS, WVT_RATIO*CL_CC_PASS, QINTS_TR)
 	   ICEDRIP_TR = ICEDRIP*PROPOR_TR
-	   QDRIPS_TR  = FVEG*SNOW*WVT_RATIO - QINTS_TR + ICEDRIP_TR
-	   call tag_precip(QTHROS, WVT_RATIO, QTHROS_TR)
+	   QDRIPS_TR  = FVEG*SNOW*WVT_RATIO*CL_CC_PASS - QINTS_TR + ICEDRIP_TR
+	   call tag_precip(QTHROS, WVT_RATIO*CL_CC_PASS, QTHROS_TR)
 	   CANICE_TR  = MAX(0.,CANICE_TR+(QINTS_TR-ICEDRIP_TR)*DT)
 	 end if
       ELSE
@@ -1460,7 +1465,7 @@ end if
 	 if (present(WVTFLAG)) then  !wt calc
 	   QINTS_TR = 0.0
 	   QDRIPS_TR = 0.0
-	   QTHROS_TR = QTHROS * WVT_RATIO
+	   QTHROS_TR = QTHROS * WVT_RATIO*CL_CC_PASS     !huancui
 	 end if
 	 IF(CANICE > 0.) THEN             ! FOR CASE OF CANOPY GETTING BURIED
 	   QDRIPS = QDRIPS + CANICE/DT

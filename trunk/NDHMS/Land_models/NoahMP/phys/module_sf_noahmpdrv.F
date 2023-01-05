@@ -75,7 +75,8 @@ CONTAINS
                , ACCPRCP,  ACCECAN, ACCETRAN,   ACCEDIR        &         ! NEW output accumulator variables
                , SOILSAT_TOP, SOILSAT, SOILICE, SNOWT_AVG      &         ! NEW soil saturation and snow temp
 #endif
-                , NTRACER, wvtflag, iopt_pm, wvt_ratio, NSUB   & ! IN WVT
+                , NTRACER, CL_CC                               & !IN WVT & chloride
+                , wvtflag, iopt_pm, wvt_ratio, NSUB            & ! IN WVT
 		, SMOIS_SUB, SH2OXY_SUB                          & ! IN WVT
                 , QFX_TR, LH_TR, SFCRUNOFF_TR, UDRUNOFF_TR     & !IN/OUT WVT
 		, SMOIS_TR, SH2OXY_TR, SNOWXY_TR, SNOWHXY_TR, CANWAT_TR &
@@ -306,6 +307,7 @@ CONTAINS
     REAL,                                            OPTIONAL, INTENT(IN   ) ::  WVT_RATIO  ! tracer ratio
     INTEGER, DIMENSION(1:NSOIL),                     OPTIONAL, INTENT(IN)    ::  NSUB
     INTEGER,                                                   INTENT(IN)    ::  NTRACER
+    REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN)    ::  CL_CC       ! chloride concentration [10-3 m3/m3]
     REAL,  DIMENSION( ims:ime, 1:ntracer, jms:jme ), OPTIONAL, INTENT(INOUT) ::  SMOIS_SUB   ! volumetric soil moisture [m3/m3]
     REAL,  DIMENSION( ims:ime, 1:ntracer, jms:jme ), OPTIONAL, INTENT(INOUT) ::  SH2OXY_SUB    ! volumetric liquid soil moisture [m3/m3]
     REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(INOUT) ::  QFX_TR        ! latent heat flux [kg s-1 m-2]
@@ -508,6 +510,7 @@ CONTAINS
     REAL                                :: PONDING2_TR     ! snowmelt with no pack [mm]
     REAL, DIMENSION( 1:NTRACER)         :: FLUX_TR         ! tracer flux at soil layer bottom [m]
     REAL                                :: sfcheadrt_tr_pass
+    REAL                                :: cl_cc_pass      ! Huancui
 !------------------------------------------------------------------------------
 
 ! Intermediate terms
@@ -732,6 +735,7 @@ end if
        if (present(RECHXY_TR))   RECH_TR                  = 0.
        if (present(DEEPRECHXY_TR)) DEEPRECH_TR              = 0.
        if (present(sfcheadrt_tr))  sfcheadrt_tr_pass        = sfcheadrt_tr(i,j)
+       if (present(CL_CC))         cl_cc_pass               = CL_CC(i,j)
 !print *, "FLAG003-1"
 !---------------------------------------------
 if (I .eq. 75 .and. J .eq. 46) then
@@ -984,6 +988,7 @@ end if
             , RUNSRF_TR=RUNSRF_TR, RUNSUB_TR=RUNSUB_TR, QSNBOT_TR=QSNBOT_TR  & !OUT
 	    , PONDING_TR=PONDING_TR, PONDING1_TR=PONDING1_TR             &  !OUT
 	    , PONDING2_TR=PONDING2_TR, FLUX_TR=FLUX_TR                   & ! OUT
+            , cl_cc_pass=cl_cc_pass                                      & ! IN CHLORIDE
 #ifdef WRF_HYDRO
             , sfcheadrt_tr_pass = sfcheadrt_tr(i,j)                      &
 #endif
