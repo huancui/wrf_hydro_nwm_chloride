@@ -48,6 +48,7 @@ module module_hrldas_netcdf_io
      real, pointer, dimension(:,:) :: pcp
      real, pointer, dimension(:,:) :: vegfra
      real, pointer, dimension(:,:) :: lai
+     real, pointer, dimension(:,:) :: cl_cc    !Huancui
   end type inputstruct
 
   character(len=256), private :: restart_filename_remember
@@ -1638,7 +1639,8 @@ contains
 !---------------------------------------------------------------------------------------------------------
 
   subroutine READFORC_HRLDAS(flnm_template, forcing_timestep, target_date, xstart, xend, ystart, yend,  &
-       t,q,u,v,p,lw,sw,pcp,vegfra,update_veg,lai,update_lai)
+       t,q,u,v,p,lw,sw,pcp,vegfra,update_veg,lai,update_lai  &
+       , cl_cc)    !Huancui 
     use kwm_string_utilities
     implicit none
 
@@ -1657,6 +1659,7 @@ contains
     real,             dimension(xstart:xend,ystart:yend), intent(out)   :: pcp
     real,             dimension(xstart:xend,ystart:yend), intent(inout) :: lai    !Barlage v3.7: change to inout
     real,             dimension(xstart:xend,ystart:yend), intent(inout) :: vegfra
+    real,             dimension(xstart:xend,ystart:yend), intent(out)   :: cl_cc  !Huancui
     logical,                            intent(in)  :: update_veg, update_lai  ! Barlage v3.7: for veg read control
 
     character(len=256) :: flnm
@@ -1758,6 +1761,7 @@ contains
        call get_2d_netcdf("LWDOWN",  ncid, nextread%lw,    units, xstart, xend, ystart, yend, FATAL, ierr)
        call get_2d_netcdf("SWDOWN",  ncid, nextread%sw,    units, xstart, xend, ystart, yend, FATAL, ierr)
        call get_2d_netcdf("RAINRATE",ncid, nextread%pcp,   units, xstart, xend, ystart, yend, FATAL, ierr)
+       call get_2d_netcdf("CHLORIDE_CC",ncid, nextread%cl_cc, units, xstart, xend, ystart, yend, FATAL, ierr)    !Huancui
        
        if(update_veg) then    ! Barlage v3.7: update only if dveg option is appropriate
        
@@ -1812,7 +1816,7 @@ contains
 
        ! Fill the t, q, u, v, ... arrays with data from the nextread structure.
        call copyfrom_inputstruct(nextread, t, q, u, v, p, lw, sw, pcp, vegfra, lai, &
-                                 update_veg, update_lai, xstart, xend, ystart, yend)
+                                 update_veg, update_lai,cl_cc, xstart, xend, ystart, yend)
 
        ! Clear the old lastread data
        call clear_inputstruct(lastread)
@@ -1836,7 +1840,7 @@ contains
 
        ! Fill the t, q, u, v, ... arrays with data interpolated between lastread and nextread times.
        call interpolate_inputstruct(lastread, nextread, target_date, &
-            t, q, u, v, p, lw, sw, pcp, vegfra, lai, update_veg, update_lai, xstart, xend, ystart, yend)
+            t, q, u, v, p, lw, sw, pcp, vegfra, lai, update_veg, update_lai,cl_cc, xstart, xend, ystart, yend)
 
     else
 
@@ -1892,6 +1896,11 @@ contains
 
     allocate(instruct%lai (xstart:xend,ystart:yend), stat=allostat )
     if (allostat/=0) stop "FATAL ERROR: In allocate_inputstruct() - Problem allocating instruct%lai"
+
+!----Huancui Hu-------
+    allocate(instruct%cl_cc (xstart:xend,ystart:yend), stat=allostat )
+    if (allostat/=0) stop "FATAL ERROR: In allocate_inputstruct() - Problem allocating instruct%cl_cc"
+!---------------------
 #ifdef MPP_LAND
     instruct%lai = 0.0
 #endif
@@ -1901,12 +1910,13 @@ contains
 !---------------------------------------------------------------------------------------------------------
 
   subroutine copyfrom_inputstruct(instruct, t, q, u, v, p, lw, sw, pcp, vegfra, lai, &
-                                  update_veg, update_lai, xstart, xend, ystart, yend)
+                                  update_veg, update_lai, cl_cc,xstart, xend, ystart, yend)
     implicit none
     type(inputstruct), intent(in) :: instruct
     integer,           intent(in) :: xstart, xend, ystart, yend
     logical,           intent(in)  :: update_veg, update_lai  ! Barlage v3.7: for veg read control
     real, dimension(xstart:xend,ystart:yend), intent(out) :: t, q, u, v, p, lw, sw, pcp, vegfra, lai
+    real, dimension(xstart:xend,ystart:yend), intent(out) :: cl_cc  !Huancui
     t    = instruct%t
     q    = instruct%q
     u    = instruct%u
@@ -1915,6 +1925,7 @@ contains
     lw   = instruct%lw
     sw   = instruct%sw
     pcp  = instruct%pcp
+    cl_cc= instruct%cl_cc     !Huancui
     if(update_veg) vegfra = instruct%vegfra
     if(update_lai)   lai  = instruct%lai
   end subroutine copyfrom_inputstruct
@@ -1923,13 +1934,14 @@ contains
 !---------------------------------------------------------------------------------------------------------
 
   subroutine interpolate_inputstruct(instructA, instructB, target_date, &
-       t, q, u, v, p, lw, sw, pcp, vegfra, lai, update_veg, update_lai, xstart, xend, ystart, yend)
+       t, q, u, v, p, lw, sw, pcp, vegfra, lai, update_veg, update_lai,cl_cc, xstart, xend, ystart, yend)
     implicit none
     type(inputstruct),                        intent(in)  :: instructA, instructB
     character(len=19),                        intent(in)  :: target_date
     integer,                                  intent(in)  :: xstart, xend, ystart, yend
     logical,                                  intent(in)  :: update_veg, update_lai  ! Barlage v3.7: for veg read control
     real, dimension(xstart:xend,ystart:yend), intent(out) :: t, q, u, v, p, lw, sw, pcp, vegfra, lai
+    real, dimension(xstart:xend,ystart:yend), intent(out) :: cl_cc   !Huancui
 
     integer :: idts, idts2
     real    :: fraction
@@ -1948,6 +1960,7 @@ contains
     pcp = instructA%pcp
     if(update_veg) vegfra = instructA%vegfra
     if(update_lai)   lai  = instructA%lai
+    cl_cc = instructA%cl_cc      !Huancui
   end subroutine interpolate_inputstruct
 
 !---------------------------------------------------------------------------------------------------------
@@ -2006,6 +2019,13 @@ contains
        deallocate(instruct%lai)
        nullify(instruct%lai)
     endif
+
+!-----Huancui Hu-----
+    if (associated(instruct%cl_cc)) then
+       deallocate(instruct%cl_cc)
+       nullify(instruct%cl_cc)
+    endif
+!--------------------
   end subroutine clear_inputstruct
 
 !---------------------------------------------------------------------------------------------------------
@@ -2025,6 +2045,7 @@ contains
     nullify(instruct%pcp)
     nullify(instruct%vegfra)
     nullify(instruct%lai)
+    nullify(instruct%cl_cc)     !Huancui
   end subroutine nullify_inputstruct
 
 !---------------------------------------------------------------------------------------------------------
