@@ -1113,10 +1113,10 @@ if (OPT_WT .eq. 1) then
   ALLOCATE ( FLUXXY_TR     (XSTART:XEND,1:NTRACER,YSTART:YEND) )     ! tracer flux at soil bottom [m]
   ALLOCATE ( SMOIS_SUB     (XSTART:XEND,1:NTRACER,YSTART:YEND) )     ! volumetric soil moisture in sublayers [m3/m3]
   ALLOCATE ( SH2OXY_SUB    (XSTART:XEND,1:NTRACER,YSTART:YEND) )     ! volumetric liquid soil moisture in sublayers [m3/m3]
-  ALLOCATE ( CL_CC        (XSTART:XEND,YSTART:YEND) )  ! chloride concentration [10-3 m3/m3]
   ALLOCATE ( RAINBL_TR    (XSTART:XEND,YSTART:YEND) )  ! "tagged" precip at each time step [mm]
   ALLOCATE ( ACRAINBL_TR  (XSTART:XEND,YSTART:YEND) )  ! accumulated "tagged" precip [mm]
 end if
+  ALLOCATE ( CL_CC        (XSTART:XEND,YSTART:YEND) )  ! chloride concentration [10-3 m3/m3]
 
 !------------------------------------------------------------------------
 ! Needed for MMF_RUNOFF (IOPT_RUN = 5); not part of MP driver in WRF
@@ -1357,10 +1357,10 @@ if (OPT_WT .eq. 1) then
   FLUXXY_TR     = undefined_real
   SMOIS_SUB      = undefined_real
   SH2OXY_SUB     = undefined_real
-  CL_CC          = undefined_real    !Huancui
   RAINBL_TR      = undefined_real
   ACRAINBL_TR    = 0.0
 end if
+  CL_CC          = undefined_real    !Huancui
 print *, "FLAG2"
 print *, "NTRACER", NTRACER
 !-------------------------------------------------
@@ -1886,16 +1886,19 @@ end subroutine land_driver_ini
      if(finemesh .ne. 0) goto 991
     
      if(forc_typ .eq. 0) then
+        write(*,*) "forc_typ ==0"
         CALL READFORC_HRLDAS(INFLNM_TEMPLATE, FORCING_TIMESTEP, OLDDATE,  &
              XSTART, XEND, YSTART, YEND,                                  &
              T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),          &
 	       P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, VEGFRA, update_veg, LAI, update_lai, CL_CC)
      else
         if(olddate == forcDate) then
+           write(*,*) "forc_typ <>0", forc_typ
            CALL HYDRO_frocing_drv(trim(indir), forc_typ,snow_assim,olddate,                      &
                xstart, xend, ystart, yend,    &
                T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),P8W(:,1,:),    &
-               GLW,SWDOWN,RAINBL_tmp,LAI,VEGFRA,SNOWH,ITIME,FORCING_TIMESTEP,prcp0)
+               GLW,SWDOWN,RAINBL_tmp,LAI,VEGFRA,SNOWH,ITIME,FORCING_TIMESTEP,prcp0, &
+               CL_CC)     !Huancui
 
                if(maxval(VEGFRA) .le. 1)  VEGFRA = VEGFRA * 100
 
@@ -2328,6 +2331,7 @@ subroutine calculate_raintag(wvt_ratio,xstart,xend,ystart,yend,CL_CC, RAINBL, RA
   if (wvt_ratio .lt. 0.5) return
   do jj = ystart,yend
     do ii = xstart,xend
+      write(*,*) "RAINBL(ii,jj),wvt_ratio,CL_CC(ii,jj):",RAINBL(ii,jj),wvt_ratio,CL_CC(ii,jj)
       RAINBL_TR(ii,jj) = RAINBL(ii,jj)*wvt_ratio*CL_CC(ii,jj)
       ACRAINBL_TR(ii,jj) = ACRAINBL_TR(ii,jj) + RAINBL_TR(ii,jj)
     end do

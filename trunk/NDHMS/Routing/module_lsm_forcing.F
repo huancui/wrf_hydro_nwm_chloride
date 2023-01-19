@@ -437,7 +437,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
 
 
 
-  subroutine READFORC_HRLDAS(flnm,ix,jx,target_date, t,q,u,v,p,lw,sw,pcp,lai,fpar)
+  subroutine READFORC_HRLDAS(flnm,ix,jx,target_date, t,q,u,v,p,lw,sw,pcp,lai,fpar,cl_cc)
     implicit none
 
     character(len=*),                   intent(in)  :: flnm
@@ -454,6 +454,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
     real,             dimension(ix,jx), intent(out) :: pcp
     real,             dimension(ix,jx), intent(inout) :: lai
     real,             dimension(ix,jx), intent(inout) :: fpar
+    real,             dimension(ix,jx), intent(inout) :: cl_cc
 
     character(len=256) :: units
     integer :: ierr
@@ -474,6 +475,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
     call get_2d_netcdf("LWDOWN",  ncid, lw,    units, ix, jx, .TRUE., ierr)
     call get_2d_netcdf("SWDOWN",  ncid, sw,    units, ix, jx, .TRUE., ierr)
     call get_2d_netcdf("RAINRATE",ncid, pcp,   units, ix, jx, .TRUE., ierr)
+    call get_2d_netcdf("CHLORIDE_CC",ncid, cl_cc, units, ix, jx, .TRUE., ierr)
     call get_2d_netcdf("VEGFRA",  ncid, fpar,  units, ix, jx, .FALSE., ierr)
     if (ierr == 0) then
       if(maxval(fpar) .gt. 10 .and. maxval(fpar) .lt. 10000)  fpar = fpar * 1.E-2
@@ -892,7 +894,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
        indir,olddate,hgrid, &
        ix,jx,forc_typ,snow_assim,  & 
        T2,q2x,u,v,pres,xlong,short,prcp1,&
-       lai,fpar,snodep,dt,k,prcp_old)
+       lai,fpar,snodep,dt,k,prcp_old, cl_cc)    !Huancui
 ! This subrouting is going to read different forcing.
    implicit none
    ! in variable
@@ -901,6 +903,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
    integer :: ix,jx,forc_typ,k,snow_assim  ! k is time loop
    real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
           prcpnew,weasd,snodep,prcp0,prcp2,prcp_old
+   real,dimension(ix,jx):: cl_cc       !Huancui 
    real ::  dt, wrf_dt
    ! tmp variable
    character(len=256) :: inflnm, inflnm2, product
@@ -929,7 +932,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
         endif
 
       CALL READFORC_HRLDAS(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-          PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+          PRES,XLONG,SHORT,PRCP1,LAI,FPAR, cl_cc)     !Huancui
    end if
 
 
@@ -948,7 +951,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
            call hydro_stop("In read_hydro_forcing_seq() - no forcing data found")
         endif
       CALL READFORC_HRLDAS(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-          PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+          PRES,XLONG,SHORT,PRCP1,LAI,FPAR, cl_cc)     !Huancui
    end if
 
 
@@ -1134,7 +1137,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
 #endif
            
            CALL READFORC_HRLDAS(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-                PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+                PRES,XLONG,SHORT,PRCP1,LAI,FPAR, cl_cc)    !Huancui
            PRCP_old = PRCP1  ! This assigns new precip to last precip as a fallback for missing data...
         endif
 
@@ -1711,7 +1714,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
        indir,olddate,hgrid, &
        ix,jx,forc_typ,snow_assim,  & 
        T2,q2x,u,v,pres,xlong,short,prcp1,&
-       lai,fpar,snodep,dt,k,prcp_old)
+       lai,fpar,snodep,dt,k,prcp_old,cl_cc)   !Huancui
 ! This subrouting is going to read different forcing.
 
 
@@ -1722,12 +1725,14 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
    integer :: ix,jx,forc_typ,k,snow_assim  ! k is time loop
    real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
           prcpnew,lai,fpar,snodep,prcp_old
+   real,dimension(ix,jx):: cl_cc    !Huancui
    real ::  dt
    ! tmp variable
    character(len=256) :: inflnm, product
    integer  :: i,j,mmflag
    real,dimension(global_nx,global_ny):: g_T2,g_Q2X,g_U,g_V,g_XLONG, &
              g_SHORT,g_PRCP1,g_PRES,g_lai,g_snodep,g_prcp_old, g_fpar
+   real,dimension(global_nx,global_ny):: g_cl_cc   !Huancui
    integer flag 
    
 
@@ -1741,6 +1746,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
      call write_io_real(PRCP1,g_PRCP1)
      call write_io_real(PRES,g_PRES)
      call write_io_real(prcp_old,g_PRCP_old)
+     call write_io_real(cl_cc,g_cl_cc)     !Huancui
 
      call write_io_real(lai,g_lai)
      call write_io_real(fpar,g_fpar)
@@ -1753,7 +1759,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
         indir,olddate,hgrid,&
         global_nx,global_ny,forc_typ,snow_assim,  &
         g_T2,g_q2x,g_u,g_v,g_pres,g_xlong,g_short,g_prcp1,&
-        g_lai,g_fpar,g_snodep,dt,k,g_prcp_old)
+        g_lai,g_fpar,g_snodep,dt,k,g_prcp_old, cl_cc)  !Huancui
 #ifdef HYDRO_D
      write(6,*) "finish read forcing,olddate ",olddate
 #endif
@@ -1768,6 +1774,7 @@ if (ierr .eq. NF_NOERR) isoilwater = istmp
      call decompose_data_real(g_PRCP1,PRCP1)
      call decompose_data_real(g_prcp_old,prcp_old)
      call decompose_data_real(g_PRES,PRES)
+     call decompose_data_real(g_cl_cc,cl_cc)    !Huancui
 
      call decompose_data_real(g_lai,lai)
      call decompose_data_real(g_fpar,fpar)
@@ -2244,7 +2251,8 @@ subroutine read_hydro_forcing_mpp1( &
      indir,olddate,hgrid, &
      ix,jx,forc_typ,snow_assim,  & 
      T2,q2x,u,v,pres,xlong,short,prcp1,&
-     lai,fpar,snodep,dt,k,prcp_old)
+     lai,fpar,snodep,dt,k,prcp_old,&
+     cl_cc)    !Huancui
 ! This subrouting is going to read different forcing.
 implicit none
 ! in variable
@@ -2253,6 +2261,7 @@ character(len=256) :: filename
 integer :: ix,jx,forc_typ,k,snow_assim  ! k is time loop
 real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
      prcpnew,weasd,snodep,prcp0,prcp2,prcp_old
+real,dimension(ix,jx):: cl_cc     !Huancui
 real ::  dt, wrf_dt
 ! tmp variable
 character(len=256) :: inflnm, inflnm2, product
@@ -2291,7 +2300,7 @@ if(FORC_TYP.eq.1) then
    print*, "read forcing data at ", OLDDATE,  trim(inflnm)
 #endif
    call READFORC_HRLDAS_mpp(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-        PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+        PRES,XLONG,SHORT,PRCP1,LAI,FPAR,cl_cc)    !Huancui
    
    where(PRCP1 .lt. 0) PRCP1= 0  ! set minimum to be 0
    where(PRCP1 .gt. 0.138889) PRCP1= 0.138889 ! set maximum to be 500 mm/h
@@ -2317,7 +2326,7 @@ if(FORC_TYP.eq.2) then
       call hydro_stop("In read_hydro_forcing_mpp1() - no forcing data found")
    endif
    call READFORC_HRLDAS_mpp(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-        PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+        PRES,XLONG,SHORT,PRCP1,LAI,FPAR,cl_cc)   !Huancui
    
    where(PRCP1 .lt. 0) PRCP1= 0  ! set minimum to be 0
    where(PRCP1 .gt. 0.138889) PRCP1= 0.138889 ! set maximum to be 500 mm/h
@@ -2531,7 +2540,7 @@ if(FORC_TYP.eq.6) then
 #endif
       
       call READFORC_HRLDAS_mpp(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-           PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+           PRES,XLONG,SHORT,PRCP1,LAI,FPAR,cl_cc)   !Huancui
       PRCP_old = PRCP1  ! This assigns new precip to last precip as a fallback for missing data...
    endif
    
@@ -2720,7 +2729,7 @@ end subroutine read_hydro_forcing_mpp1
 
 
 
-  subroutine READFORC_HRLDAS_mpp(flnm,ix,jx,target_date, t,q,u,v,p,lw,sw,pcp,lai,fpar)
+  subroutine READFORC_HRLDAS_mpp(flnm,ix,jx,target_date, t,q,u,v,p,lw,sw,pcp,lai,fpar, cl_cc)  !Huancui
     implicit none
 
     character(len=*),                   intent(in)  :: flnm
@@ -2737,6 +2746,7 @@ end subroutine read_hydro_forcing_mpp1
     real,             dimension(ix,jx), intent(out) :: pcp
     real,             dimension(ix,jx), intent(inout) :: lai
     real,             dimension(ix,jx), intent(inout) :: fpar
+    real,             dimension(ix,jx), intent(inout) :: cl_cc
 
     character(len=256) :: units
     integer :: ierr
@@ -2776,6 +2786,10 @@ end subroutine read_hydro_forcing_mpp1
     call decompose_data_real (buf2,sw)
     if(my_id .eq. io_id ) call get_2d_netcdf("RAINRATE", ncid,buf2, units, global_nx, global_ny, .TRUE., ierr)
     call decompose_data_real (buf2,pcp)
+!---Huancui-----
+    if(my_id .eq. io_id ) call get_2d_netcdf("CHLORIDE_CC", ncid,buf2, units, global_nx, global_ny, .TRUE., ierr)
+    call decompose_data_real (buf2,cl_cc)
+!---------------
     if(my_id .eq. io_id ) then 
           call get_2d_netcdf("VEGFRA", ncid,buf2, units, global_nx, global_ny, .FALSE., ierr)
           if (ierr == 0) then
@@ -2804,6 +2818,7 @@ end subroutine read_hydro_forcing_mpp1
     call get_2d_netcdf("SWDOWN",  ncid, sw,    units, ix, jx, .TRUE., ierr)
     call get_2d_netcdf("RAINRATE",ncid, pcp,   units, ix, jx, .TRUE., ierr)
     call get_2d_netcdf("VEGFRA",  ncid, fpar,  units, ix, jx, .FALSE., ierr)
+    call get_2d_netcdf("CHLORIDE_CC",ncid, cl_cc,  units, ix, jx, .FALSE., ierr)   !Huancui
 
     if (ierr == 0) then
       if(maxval(fpar) .gt. 10 .and. maxval(fpar) .lt. 10000)  fpar = fpar * 1.E-2
