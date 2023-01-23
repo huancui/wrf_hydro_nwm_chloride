@@ -35,6 +35,11 @@
   REAL,    allocatable, DIMENSION(:)        :: z_gwsubbas_tr      !tracer storage depth in GW bucket
   REAL,    allocatable, DIMENSION(:)        :: qin_gwsubbas_tr    !flow to GW bucket
   REAL,    allocatable, DIMENSION(:)        :: qout_gwsubbas_tr   !flow from GW bucket
+  REAL,    allocatable, DIMENSION(:)        :: z_gwsubbas_passive !passive storage depth in GW bucket
+  REAL,    allocatable, DIMENSION(:)        :: z_gwsubbas_active  !active storage depth in GW bucket
+  REAL,    allocatable, DIMENSION(:)        :: z_gwsubbas_passive_tr !tracer passive storage depth in GW bucket
+  REAL,    allocatable, DIMENSION(:)        :: z_gwsubbas_active_tr  !tracer active storage depth in GW bucket
+  REAL,    allocatable, DIMENSION(:)        :: cm_gwsubbas        !exchange coefficient between passive and active storage in GW bucket
   REAL,    allocatable, DIMENSION(:,:)      :: QLINK_tr           !flow in link
   REAL,    allocatable, DIMENSION(:)        :: HLINK_tr           !head in link
   REAL,    allocatable, DIMENSION(:)        :: QLateral_tr        !lateral flow
