@@ -164,17 +164,17 @@ INTERFACE
 !-------------------------------------------------
 ! Needed for water tracer capability
 !-------------------------------------------------
-        INTEGER,          INTENT(IN)                  :: NTRACER
-        INTEGER,          INTENT(IN)                  :: NSOIL
-        INTEGER,OPTIONAL, INTENT(IN)                  :: WVTFLAG
-        INTEGER,OPTIONAL, INTENT(IN)                  :: PMOPT
-        INTEGER,OPTIONAL, INTENT(IN),   DIMENSION(NSOIL) :: NSUB
-        REAL,   OPTIONAL, INTENT(IN),   DIMENSION(NSOIL) :: SLDPTH
-        INTEGER,OPTIONAL, INTENT(IN),   DIMENSION(XX,YY) :: SATLYRCHK
-        REAL,   OPTIONAL, INTENT(OUT),  DIMENSION(XX,YY) :: QSUBRT_SUB_GAIN
-        REAL,   OPTIONAL, INTENT(OUT),  DIMENSION(XX,YY) :: QSUBRT_TR_GAIN
-        REAL,   OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY) :: QSUBBDRYRT_TR_PASS
-        REAL,   OPTIONAL, INTENT(INOUT)                  :: QSUBBDRYTRT_TR_PASS
+        INTEGER,          INTENT(IN)                             :: NTRACER
+        INTEGER,          INTENT(IN)                             :: NSOIL
+        INTEGER,OPTIONAL, INTENT(IN)                             :: WVTFLAG
+        INTEGER,OPTIONAL, INTENT(IN)                             :: PMOPT
+        INTEGER,OPTIONAL, INTENT(IN),   DIMENSION(NSOIL)         :: NSUB
+        REAL,   OPTIONAL, INTENT(IN),   DIMENSION(NSOIL)         :: SLDPTH
+        INTEGER,OPTIONAL, INTENT(IN),   DIMENSION(XX,YY)         :: SATLYRCHK
+        REAL,   OPTIONAL, INTENT(OUT),  DIMENSION(XX,YY,NTRACER) :: QSUBRT_SUB_GAIN
+        REAL,   OPTIONAL, INTENT(OUT),  DIMENSION(XX,YY,NTRACER) :: QSUBRT_TR_GAIN
+        REAL,   OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY,NTRACER) :: QSUBBDRYRT_TR_PASS
+        REAL,   OPTIONAL, INTENT(INOUT)                          :: QSUBBDRYTRT_TR_PASS
         REAL,   OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY,NTRACER) :: SMCRT_TR_PASS
         REAL,   OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY,NTRACER) :: SMCRT_SUB_PASS
   end subroutine ROUTE_SUBSURFACE1
@@ -219,20 +219,22 @@ END INTERFACE
         INTEGER,OPTIONAL,INTENT(IN)                                :: WVTFLAG
         INTEGER,OPTIONAL,INTENT(IN)                                :: PMOPT
         INTEGER,OPTIONAL,INTENT(IN),   DIMENSION(NSOIL)            :: NSUB
-        REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT)        :: QSUBBDRYRT_TR_PASS
-        REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT)        :: QSUBRT_TR_GAIN
+        REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT,NTRACER):: QSUBBDRYRT_TR_PASS
+        REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT,NTRACER):: QSUBRT_TR_GAIN
         REAL,   OPTIONAL,INTENT(INOUT)                             :: QSUBBDRYTRT_TR_PASS
         REAL,   OPTIONAL,INTENT(INOUT),DIMENSION(IXRT,JXRT)        :: INFXSUBRT_TR_PASS
         REAL,   OPTIONAL,INTENT(INOUT),DIMENSION(IXRT,JXRT,NTRACER):: SMCRT_TR_PASS
         REAL,   OPTIONAL,INTENT(INOUT),DIMENSION(IXRT,JXRT,NTRACER):: SMCRT_SUB_PASS
         REAL,   OPTIONAL,INTENT(INOUT),DIMENSION(IXRT,JXRT,NTRACER):: SMCMAXRT_SUB_PASS
         !-----local vars------
-        REAL,   DIMENSION(IXRT,JXRT)  :: QSUBRT_SUB_GAIN
-        REAL                          :: SUBFLO_TR
-        REAL                          :: SUBFLO_SUB
-        REAL                          :: PROPOR_TR
-        INTEGER                       :: KSUB
-        INTEGER                       :: ISUB
+        REAL,   DIMENSION(IXRT,JXRT,NTRACER)  :: QSUBRT_SUB_GAIN
+        REAL,   DIMENSION(NTRACER)            :: SUBFLO_TR
+        REAL,   DIMENSION(NTRACER)            :: SUBFLO_SUB
+        REAL                                  :: PROPOR_TR
+        INTEGER                               :: KSUB, KSOIL
+        INTEGER                               :: ISUB
+        REAL                                  :: SUBFLO_INIT, SUBFLO_EXCESS
+        INTEGER                               :: INFXSUBRT_TR_FILL
 !-------------------------------------------------------------------
 
 	REAL, DIMENSION(IXRT,JXRT)	:: ywtmp
@@ -355,7 +357,13 @@ END INTERFACE
 ! rt_option flag). Remove this hard-coded option when rt_option=2 is fixed for subsurface.
 !     if(rt_option .eq. 1) then
       if (present(WVTFLAG)) then
-!print *, "FLAG IN SUBSFC_RTNG002, SMCRT(162,108,:),SMCRT_TR_PASS(162,108,:),SMCRT_SUB_PASS(162,108,:):",SMCRT(162,108,:),SMCRT_TR_PASS(162,108,:),SMCRT_SUB_PASS(162,108,:)
+!-----for debug purpose-----
+!print *, "FLAG IN SUBSFC_RTNG002,before ROUTE_SUBSURFACE1"
+!print *, "sum(SMCRT(29:32,13:16,:),sum(SMCRT_SUB_PASS(29:32,13:16,:)),sum(SMCRT_TR_PASS(29:32,13:16,:)):"
+!print *, SMCRT(29:32,13:16,1)*100.+SMCRT(29:32,13:16,2)*300.+SMCRT(29:32,13:16,3)*600.+SMCRT(29:32,13:16,4)*1000.
+!print *, SMCRT_SUB_PASS(29:32,13:16,1)*100.+SMCRT_SUB_PASS(29:32,13:16,2)*300.+SMCRT_SUB_PASS(29:32,13:16,3)*600.+SMCRT_SUB_PASS(29:32,13:16,4)*1000.
+!print *, SMCRT_TR_PASS(29:32,13:16,1)*100.+SMCRT_TR_PASS(29:32,13:16,2)*300.+SMCRT_TR_PASS(29:32,13:16,3)*600.+SMCRT_TR_PASS(29:32,13:16,4)*1000.
+!---------------------------
         CALL ROUTE_SUBSURFACE1(dist,ZWATTABLRT,QSUBRT,SOXRT,SOYRT,  &
                LATKSATRT,SOLDEPRT,IXRT,JXRT,QSUBBDRYRT,QSUBBDRYTRT, &
                SO8RT,SO8RT_D,CWATAVAIL,SUBDT  &
@@ -372,7 +380,13 @@ END INTERFACE
               ,SMCRT_TR_PASS      = SMCRT_TR_PASS    &
               ,SMCRT_SUB_PASS     = SMCRT_SUB_PASS   &
               )
-!print *, "FLAG IN SUBSFC_RTNG003, SMCRT(162,108,:),SMCRT_TR_PASS(162,108,:),SMCRT_SUB_PASS(162,108,:):",SMCRT(162,108,:),SMCRT_TR_PASS(162,108,:),SMCRT_SUB_PASS(162,108,:)
+!-----for debug purpose-----
+!print *, "FLAG IN SUBSFC_RTNG002,after ROUTE_SUBSURFACE1"
+!print *, "sum(SMCRT(29:32,13:16,:),sum(SMCRT_SUB_PASS(29:32,13:16,:)),sum(SMCRT_TR_PASS(29:32,13:16,:)):"
+!print *, SMCRT(29:32,13:16,1)*100.+SMCRT(29:32,13:16,2)*300.+SMCRT(29:32,13:16,3)*600.+SMCRT(29:32,13:16,4)*1000.
+!print *, SMCRT_SUB_PASS(29:32,13:16,1)*100.+SMCRT_SUB_PASS(29:32,13:16,2)*300.+SMCRT_SUB_PASS(29:32,13:16,3)*600.+SMCRT_SUB_PASS(29:32,13:16,4)*1000.
+!print *, SMCRT_TR_PASS(29:32,13:16,1)*100.+SMCRT_TR_PASS(29:32,13:16,2)*300.+SMCRT_TR_PASS(29:32,13:16,3)*600.+SMCRT_TR_PASS(29:32,13:16,4)*1000.
+!---------------------------
       else
         CALL ROUTE_SUBSURFACE1(dist,ZWATTABLRT,QSUBRT,SOXRT,SOYRT,  &   
                LATKSATRT,SOLDEPRT,IXRT,JXRT,QSUBBDRYRT,QSUBBDRYTRT, &   
@@ -407,11 +421,23 @@ END INTERFACE
              SUBFLO=QSUBRT(I,J)/dist(i,j,9)*SUBDT !Convert qsubrt from m^3/s to m
              !-----wt cacl-----
              if (present(WVTFLAG)) then
-               SUBFLO_SUB=QSUBRT_SUB_GAIN(I,J)/dist(i,j,9)*SUBDT    ! can only be >0 no matter what SUBLO is
-               SUBFLO_TR =QSUBRT_TR_GAIN(I,J)/dist(i,j,9)*SUBDT
+               INFXSUBRT_TR_FILL = 0         !initialize INFXSUBRT_TR_FILL
+               SUBFLO_INIT       = SUBFLO    !save this value for tracer purpose
+               SUBFLO_EXCESS     = 0.0
+               SUBFLO_SUB        = 0.0
+               SUBFLO_TR         = 0.0
+               do KSOIL  = 1, NSOIL
+                 do KSUB = 1, NSUB(KSOIL)
+                   ISUB  = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+                   SUBFLO_SUB(ISUB) = QSUBRT_SUB_GAIN(I,J,ISUB)/dist(i,j,9)*SUBDT    ! can only be >0 no matter what SUBLO is
+                   SUBFLO_TR(ISUB)  = QSUBRT_TR_GAIN(I,J,ISUB)/dist(i,j,9)*SUBDT
+                 end do
+               end do
 !----for debug purpose----
-if (I .eq. 162 .and. J .eq. 108) then
-!  print *, "FLAG IN SUBSFC_RTNG0031, SUBFLO, SUBFLO_SUB, SUBFLO_TR,SMCRT(I,J,:),SMCRT_SUB_PASS(I,J,:),SMCRT_TR_PASS(I,J,:):",SUBFLO, SUBFLO_SUB, SUBFLO_TR,SMCRT(I,J,:),SMCRT_SUB_PASS(I,J,:),SMCRT_TR_PASS(I,J,:)
+!if (I .gt. 28 .and. I .le. 32 .and. J .gt. 12 .and. J .le. 16) then
+if (I .eq. 1 .and. J .eq. 12) then
+!  print *, "FLAG IN SUBSFC_RTNG0031"
+!  print *, "I,J,SUBFLO_INIT, sum(SUBFLO_SUB), sum(SUBFLO_TR):",I,J,SUBFLO_INIT, sum(SUBFLO_SUB), sum(SUBFLO_TR)
 end if
 !-------------------------
              end if
@@ -437,83 +463,15 @@ end if
                        SMCRT(I,J,KK), SMCMAXRT(I,J,KK),KK,i,j
                    call hydro_stop("In SUBSFC_RTNG() - SMCMAX exceeded")
                   ELSE
-                   !----water tracer calc-----
-                   if (present(WVTFLAG)) then
-                     call calculate_wt_ratio(SUBFLO_TR, SUBFLO_SUB, PROPOR_TR)
-                      do KSUB = NSUB(KK),1,-1
-                        ISUB = sum(NSUB(1:KK))-NSUB(KK)+KSUB
-                        SUBFLO_SUB = SUBFLO_SUB - max(0.0, (SMCMAXRT_SUB_PASS(I,J,ISUB)-SMCRT_SUB_PASS(I,J,ISUB)))*SLDPTH(KK)/NSUB(KK)
-                        SUBFLO_TR  = SUBFLO_TR  - max(0.0, (SMCMAXRT_SUB_PASS(I,J,ISUB)-SMCRT_SUB_PASS(I,J,ISUB)))*SLDPTH(KK)/NSUB(KK)*PROPOR_TR
-                        SMCRT_TR_PASS(I,J,ISUB) = SMCRT_TR_PASS(I,J,ISUB)+max(0.0,(SMCMAXRT_SUB_PASS(I,J,ISUB)-SMCRT_SUB_PASS(I,J,ISUB))*PROPOR_TR)
-                        SMCRT_SUB_PASS(I,J,ISUB)= SMCMAXRT_SUB_PASS(I,J,ISUB)
-                        SMCRT_SUB_PASS(I,J,ISUB)= min(SMCRT_SUB_PASS(I,J,ISUB),SMCRT(I,J,KK))
-                        SMCRT_TR_PASS(I,J,ISUB) = min(SMCRT_TR_PASS(I,J,ISUB), SMCRT_SUB_PASS(I,J,ISUB))
-!----for debug purpose----
-if (I .eq. 162 .and. J .eq. 108) then
-!  print *, "FLAG IN SUBSFC_RTNG0032-1, KK,ISUB,PROPOR_TR, SMCRT_TR_PASS(I,J,ISUB),SMCRT_SUB_PASS(I,J,ISUB),SMCRT(I,J,KK),SUBFLO,SUBFLO_SUB,SUBFLO_TR:",KK,ISUB,PROPOR_TR, SMCRT_TR_PASS(I,J,ISUB),SMCRT_SUB_PASS(I,J,ISUB),SMCRT(I,J,KK),SUBFLO,SUBFLO_SUB,SUBFLO_TR
-end if
-!-------------------------
-                      end do
-                   end if
-                   !--------------------------
                   END IF
                 ELSE
                   WATAVAIL = (SMCMAXRT(I,J,KK)-SMCRT(I,J,KK))*SLDPTH(KK)
                   IF (WATAVAIL.GE.SUBFLO) THEN
                     SMCRT(I,J,KK) = SMCRT(I,J,KK) + SUBFLO/SLDPTH(KK)
                     SUBFLO = 0.
-                    !-----wt cacl-----
-                    if (present(WVTFLAG) ) then
-                      call adjust_smc_tr2(I,J,NSOIL, NTRACER, SLDPTH, NSUB,&
-                                        KK, SMCRT(I,J,:), SMCRT_SUB_PASS(I,J,:),SMCRT_TR_PASS(I,J,:),&
-                                        SUBFLO_SUB, SUBFLO_TR)
-
-!                      call calculate_wt_ratio(SUBFLO_TR, SUBFLO_SUB, PROPOR_TR)
-!                      do KSUB = NSUB(KK),1,-1
-!                        ISUB = sum(NSUB(1:KK))-NSUB(KK)+KSUB
-!                        SMCRT_TR_PASS(I,J,ISUB)  = SMCRT_TR_PASS(I,J,ISUB)+max(0.0, (SMCRT(I,J,KK)-SMCRT_SUB_PASS(I,J,ISUB))*PROPOR_TR)
-!                        SMCRT_SUB_PASS(I,J,ISUB) = SMCRT(I,J,KK)
-!                        SMCRT_TR_PASS(I,J,ISUB)  = min(SMCRT_TR_PASS(I,J,ISUB),SMCRT_SUB_PASS(I,J,ISUB))
-!                      end do
-!                      SUBFLO_TR  = 0.0
-!                      SUBFLO_SUB = 0.0
-!----for debug purpose----
-if (I .eq. 162 .and. J .eq. 108) then
-!  print *, "FLAG IN SUBSFC_RTNG0032, KK,ISUB,PROPOR_TR, SMCRT_TR_PASS(I,J,ISUB),SMCRT_SUB_PASS(I,J,ISUB),SMCRT(I,J,KK):",KK,ISUB,PROPOR_TR, SMCRT_TR_PASS(I,J,ISUB),SMCRT_SUB_PASS(I,J,ISUB),SMCRT(I,J,KK)
-end if
-!-------------------------
-                    end if
-                    !-----------------
                   ELSE
                     SUBFLO = SUBFLO - WATAVAIL
                     SMCRT(I,J,KK) = SMCMAXRT(I,J,KK)
-                    !-----wt cacl-----
-                    if (present(WVTFLAG)) then
-                      call calculate_wt_ratio(SUBFLO_TR, SUBFLO_SUB, PROPOR_TR)
-                      do KSUB = NSUB(KK),1,-1
-                        ISUB = sum(NSUB(1:KK))-NSUB(KK)+KSUB
-                        SUBFLO_SUB = SUBFLO_SUB - max(0.0, (SMCMAXRT_SUB_PASS(I,J,ISUB)-SMCRT_SUB_PASS(I,J,ISUB)))*SLDPTH(KK)/NSUB(KK)
-                        SUBFLO_TR  = SUBFLO_TR  - max(0.0, (SMCMAXRT_SUB_PASS(I,J,ISUB)-SMCRT_SUB_PASS(I,J,ISUB)))*SLDPTH(KK)/NSUB(KK)*PROPOR_TR
-                        SMCRT_TR_PASS(I,J,ISUB) = SMCRT_TR_PASS(I,J,ISUB)+max(0.0,(SMCMAXRT_SUB_PASS(I,J,ISUB)-SMCRT_SUB_PASS(I,J,ISUB))*PROPOR_TR)
-                        SMCRT_SUB_PASS(I,J,ISUB)= SMCMAXRT_SUB_PASS(I,J,ISUB)
-                        SMCRT_SUB_PASS(I,J,ISUB)= min(SMCRT_SUB_PASS(I,J,ISUB),SMCRT(I,J,KK))
-                        SMCRT_TR_PASS(I,J,ISUB) = min(SMCRT_TR_PASS(I,J,ISUB), SMCRT_SUB_PASS(I,J,ISUB))
-!----for debug purpose----
-if (I .eq. 162 .and. J .eq. 108) then
-!  print *, "FLAG IN SUBSFC_RTNG0033, KK,ISUB,PROPOR_TR, SMCRT_TR_PASS(I,J,ISUB),SMCRT_SUB_PASS(I,J,ISUB),SMCRT(I,J,KK),SUBFLO,SUBFLO_SUB,SUBFLO_TR:",KK,ISUB,PROPOR_TR, SMCRT_TR_PASS(I,J,ISUB),SMCRT_SUB_PASS(I,J,ISUB),SMCRT(I,J,KK),SUBFLO,SUBFLO_SUB,SUBFLO_TR
-end if
-!-------------------------
-                      end do
-                      if (KK .eq. 1) then
-                        if (abs(SUBFLO_SUB-SUBFLO) .gt. 1.5E10-8) then
-                          print *, "ERROR near FLAG IN SUBSFC_RTNG0033, I,J, KK, ISUB, PROPOR_TR, SMCRT_TR_PASS(I,J,ISUB),SMCRT_SUB_PASS(I,J,ISUB),SMCRT(I,J,KK),SUBFLO,SUBFLO_SUB,SUBFLO_TR:", I,J, KK, ISUB, PROPOR_TR, SMCRT_TR_PASS(I,J,ISUB),SMCRT_SUB_PASS(I,J,ISUB),SMCRT(I,J,KK),SUBFLO,SUBFLO_SUB,SUBFLO_TR
-                        else
-                          SUBFLO_SUB = SUBFLO
-                          SUBFLO_TR  = min(SUBFLO_SUB,SUBFLO_TR)
-                        end if
-                      end if
-                    end if
-!                    !-----------------
                   END IF
                 END IF
 
@@ -528,9 +486,8 @@ end if
               IF (KK.eq.0.AND.SUBFLO.gt.0.) then
                  !-----wt calc-----
                  if (present(WVTFLAG)) then
-                   INFXSUBRT_TR_PASS(I,J) = INFXSUBRT_TR_PASS(I,J) + SUBFLO_TR*1000.
-                   SUBFLO_TR = 0.0
-                   SUBFLO_SUB= 0.0
+                   INFXSUBRT_TR_FILL      = 1       !to mark that all layers saturated, and to add remaining subflo to infilt. excess
+                   SUBFLO_EXCESS          = SUBFLO
                  end if
                  !-----------------
                  INFXSUBRT(I,J) = INFXSUBRT(I,J) + SUBFLO*1000.    !Units = mm
@@ -564,26 +521,6 @@ end if
                    SMCRT(I,J,KK)=SMCREFRT(I,J,KK)
                    SUBFLO=SUBFLO+WATAVAIL
                  END IF
-                 !------wt cal-----
-                 if (abs(SUBFLO) .lt. 1.0E-10) then     !only call when KK loop finishes subtracting moisture
-                   if (present(WVTFLAG)) then
-!----for debug purpose----
-if (I .eq. 93 .and. J .eq. 117) then
-!  print *, "FLAG IN SUBSFC_RTNG0034, KK, SMCRT_TR_PASS(I,J,:),SMCRT_SUB_PASS(I,J,:),SMCRT(I,J,:),SUBFLO,SUBFLO_SUB,SUBFLO_TR:",KK,ISUB,SMCRT_TR_PASS(I,J,:),SMCRT_SUB_PASS(I,J,:),SMCRT(I,J,:),SUBFLO,SUBFLO_SUB,SUBFLO_TR
-!  print *, "SATLYRCHK(I,J),KK:",SATLYRCHK(I,J),KK
-end if
-!-------------------------
-                     call adjust_smc_tr(I,J,NSOIL, NTRACER, SLDPTH, NSUB, SATLYRCHK(I,J),&
-                                        KK, SMCRT(I,J,:), SMCRT_SUB_PASS(I,J,:),SMCRT_TR_PASS(I,J,:),&
-                                        SUBFLO_SUB, SUBFLO_TR)
-!----for debug purpose----
-if (I .eq. 93 .and. J .eq. 117) then
-!  print *, "FLAG IN SUBSFC_RTNG0035, KK, SMCRT_TR_PASS(I,J,:),SMCRT_SUB_PASS(I,J,:),SMCRT(I,J,:),SUBFLO,SUBFLO_SUB,SUBFLO_TR:",KK,ISUB,SMCRT_TR_PASS(I,J,:),SMCRT_SUB_PASS(I,J,:),SMCRT(I,J,:),SUBFLO,SUBFLO_SUB,SUBFLO_TR
-end if
-!-------------------------
-                   end if
-                 end if
-                 !-----------------
 
                  IF (SUBFLO.EQ.0.) EXIT
 !                IF (SUBFLO.EQ.0.) goto 668
@@ -595,10 +532,6 @@ end if
 !DJG Error trap...
               if(abs(subflo) .le. 1.E-7 )  then
                 subflo = 0.0  !truncate residual to 1E-7 prec.
-                if (present(WVTFLAG)) then
-                  subflo_tr = 0.0
-                  subflo_sub= 0.0
-                end if
               end if
 
 	       if (subflo.ne.0.) then
@@ -612,10 +545,58 @@ end if
                end if
 
 
-
             END IF  ! end if for +/- SUBFLO soil moisture accounting...
 
 
+!-------------different pathways for tracer transport in subsurface routing----------
+              if (present(WVTFLAG)) then
+                if (present(PMOPT)) then
+!-----debug purpose-----
+!if (I .gt. 28 .and. I .le. 32 .and. J .gt. 12 .and. J .le. 16) then
+if (I .eq. 1 .and. J .eq. 12) then
+!  print *, "FLAG before implement_tracerflow_xxxx:"
+!  print *, "I,J,sum(SMCRT(I,J,:)),sum(SMCRT_SUB_PASS(I,J,:)),sum(SMCRT_TR_PASS(I,J,:)):",I,J,SMCRT(I,J,1)*100.+SMCRT(I,J,2)*300.+SMCRT(I,J,3)*600.+SMCRT(I,J,4)*1000.,SMCRT_SUB_PASS(I,J,1)*100.+SMCRT_SUB_PASS(I,J,2)*300.+SMCRT_SUB_PASS(I,J,3)*600.+SMCRT_SUB_PASS(I,J,4)*1000.,SMCRT_TR_PASS(I,J,1)*100.+SMCRT_TR_PASS(I,J,2)*300.+SMCRT_TR_PASS(I,J,3)*600.+SMCRT_TR_PASS(I,J,4)*1000.
+!  print *, "INFXSUBRT_TR_FILL,INFXSUBRT(I,J),INFXSUBRT_TR_PASS(I,J):",INFXSUBRT_TR_FILL,INFXSUBRT(I,J),INFXSUBRT_TR_PASS(I,J)
+!  print *, "SUBFLO_INIT,sum(SUBFLO_SUB),sum(SUBFLO_TR) (in m):",SUBFLO_INIT,sum(SUBFLO_SUB),sum(SUBFLO_TR)
+end if
+                  if (PMOPT .eq. 15 .or. PMOPT .eq. 25) then
+                    ! add bottom-to-top flow
+                    call implement_tracerflow_bottom2top(I,J, NSOIL, NTRACER, SLDPTH, NSUB, &
+                          SMCRT(I,J,:), SMCRT_SUB_PASS(I,J,:), SMCRT_TR_PASS(I,J,:),        &
+                          SUBFLO_INIT, SUBFLO_SUB, SUBFLO_TR, INFXSUBRT_TR_FILL,INFXSUBRT_TR_PASS(I,J))
+                  else
+                    if (PMOPT .eq. 16 .or. PMOPT .eq. 26) then
+                      ! add laminar flow
+                      call implement_tracerflow_laminar(I,J, NSOIL, NTRACER, SLDPTH, NSUB, &
+                          SMCRT(I,J,:), SMCRT_SUB_PASS(I,J,:), SMCRT_TR_PASS(I,J,:),        &
+                          SUBFLO_INIT, SUBFLO_SUB, SUBFLO_TR, INFXSUBRT_TR_FILL,INFXSUBRT_TR_PASS(I,J))
+                    else
+                      if (PMOPT .eq. 17 .or. PMOPT .eq. 27) then
+                        ! add top-to-bottom flow
+                        call implement_tracerflow_top2bottom(I,J, NSOIL, NTRACER, SLDPTH, NSUB, &
+                          SMCRT(I,J,:), SMCRT_SUB_PASS(I,J,:), SMCRT_TR_PASS(I,J,:),        &
+                          SUBFLO_INIT, SUBFLO_SUB, SUBFLO_TR, INFXSUBRT_TR_FILL,SUBFLO_EXCESS,INFXSUBRT_TR_PASS(I,J))
+                      else
+                      ! add default flow (fill water gaps)
+                        call implement_tracerflow_fill(I,J, NSOIL, NTRACER, SLDPTH, NSUB, &
+                          SMCRT(I,J,:), SMCRT_SUB_PASS(I,J,:), SMCRT_TR_PASS(I,J,:),        &
+                          SUBFLO_INIT, SUBFLO_SUB, SUBFLO_TR, INFXSUBRT_TR_FILL,INFXSUBRT_TR_PASS(I,J))
+                      end if
+                    end if
+                  end if
+!----debug purpose-----
+!if (I .gt. 28 .and. I .le. 32 .and. J .gt. 12 .and. J .le. 16) then
+if (I .eq. 1 .and. J .eq. 12) then
+!  print *, "FLAG after implement_tracerflow_xxxx:"
+!  print *, "I,J,sum(SMCRT(I,J,:)),sum(SMCRT_SUB_PASS(I,J,:)),sum(SMCRT_TR_PASS(I,J,:)):",I,J,SMCRT(I,J,1)*100.+SMCRT(I,J,2)*300.+SMCRT(I,J,3)*600.+SMCRT(I,J,4)*1000.,SMCRT_SUB_PASS(I,J,1)*100.+SMCRT_SUB_PASS(I,J,2)*300.+SMCRT_SUB_PASS(I,J,3)*600.+SMCRT_SUB_PASS(I,J,4)*1000.,SMCRT_TR_PASS(I,J,1)*100.+SMCRT_TR_PASS(I,J,2)*300.+SMCRT_TR_PASS(I,J,3)*600.+SMCRT_TR_PASS(I,J,4)*1000.
+!  print *, "INFXSUBRT_TR_FILL,INFXSUBRT(I,J),INFXSUBRT_TR_PASS(I,J):",INFXSUBRT_TR_FILL,INFXSUBRT(I,J),INFXSUBRT_TR_PASS(I,J)
+!  print *, "SUBFLO_INIT,sum(SUBFLO_SUB),sum(SUBFLO_TR) (in m):",SUBFLO_INIT,sum(SUBFLO_SUB),sum(SUBFLO_TR)
+
+end if
+!----------------------
+                end if
+              end if
+!------------------------------------------------------------------------------------
 
 
           END DO        ! END DO X dim
@@ -1722,23 +1703,23 @@ END INTERFACE
 !-------------------------------------------------
 ! Needed for water tracer capability
 !-------------------------------------------------
-        INTEGER,          INTENT(IN)                  :: NTRACER
-        INTEGER,          INTENT(IN)                  :: NSOIL
-        INTEGER,OPTIONAL, INTENT(IN)                  :: WVTFLAG
-        INTEGER,OPTIONAL, INTENT(IN)                  :: PMOPT
-        INTEGER,OPTIONAL, INTENT(IN),   DIMENSION(NSOIL) :: NSUB
-        REAL,   OPTIONAL, INTENT(IN),   DIMENSION(NSOIL) :: SLDPTH
-        INTEGER,OPTIONAL, INTENT(IN),   DIMENSION(XX,YY) :: SATLYRCHK
-        REAL,   OPTIONAL, INTENT(OUT),  DIMENSION(XX,YY) :: QSUBRT_SUB_GAIN
-        REAL,   OPTIONAL, INTENT(OUT),  DIMENSION(XX,YY) :: QSUBRT_TR_GAIN
-        REAL,   OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY) :: QSUBBDRYRT_TR_PASS
-        REAL,   OPTIONAL, INTENT(INOUT)                  :: QSUBBDRYTRT_TR_PASS
+        INTEGER,          INTENT(IN)                             :: NTRACER
+        INTEGER,          INTENT(IN)                             :: NSOIL
+        INTEGER,OPTIONAL, INTENT(IN)                             :: WVTFLAG
+        INTEGER,OPTIONAL, INTENT(IN)                             :: PMOPT
+        INTEGER,OPTIONAL, INTENT(IN),   DIMENSION(NSOIL)         :: NSUB
+        REAL,   OPTIONAL, INTENT(IN),   DIMENSION(NSOIL)         :: SLDPTH
+        INTEGER,OPTIONAL, INTENT(IN),   DIMENSION(XX,YY)         :: SATLYRCHK
+        REAL,   OPTIONAL, INTENT(OUT),  DIMENSION(XX,YY,NTRACER) :: QSUBRT_SUB_GAIN
+        REAL,   OPTIONAL, INTENT(OUT),  DIMENSION(XX,YY,NTRACER) :: QSUBRT_TR_GAIN
+        REAL,   OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY,NTRACER) :: QSUBBDRYRT_TR_PASS
+        REAL,   OPTIONAL, INTENT(INOUT)                          :: QSUBBDRYTRT_TR_PASS
         REAL,   OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY,NTRACER) :: SMCRT_TR_PASS
         REAL,   OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY,NTRACER) :: SMCRT_SUB_PASS
         !-----local vars----
-        INTEGER    :: KSUB, ISUB
+        INTEGER    :: KSUB, ISUB, KSOIL
         REAL       :: PROPOR_TR
-        REAL       :: qqsub_tr_lose, qqsub_sub_lose
+        REAL, DIMENSION(NTRACER)       :: qqsub_tr_lose, qqsub_sub_lose
 !-------------------------------------------------
 
 !!! Declare Local Variables
@@ -1836,24 +1817,41 @@ END INTERFACE
 
               !-----wt calc-----
               if (present(WVTFLAG)) then
-if (i .eq. 79 .and. j .eq. 98 ) then
-!  print *, "FLAG in ROUTE_SUBSURFACE1000, qqsub, qqsub_sub_lose,qqsub_tr_lose:",qqsub, qqsub_sub_lose,qqsub_tr_lose
-!  print *, "FLAG in ROUTE_SUBSURFACE1000, SMCRT_SUB_PASS(i,j,:):",SMCRT_SUB_PASS(i,j,:)
-end if
                 if (qqsub .le. 1.0e-12 .and. SATLYRCHK(i,j) .lt. NSOIL+1) then
+!-----debug purpose-----
+if (i .gt. 28 .and. i .le. 32 .and. j .gt. 12 .and. j .le. 16 ) then
+!  print *,"FLAG in ROUTE_SUBSURFACE1000 before calculate_qsubout_tr"
+!  print *, "i,j,qqsub(in m):", i,j,qqsub/dist(i,j,9)*SUBDT
+!  print *, "sum(SMCRT_SUB_PASS(i,j,:)),sum(SMCRT_TR_PASS(i,j,:)):",SMCRT_SUB_PASS(i,j,1)*100.+SMCRT_SUB_PASS(i,j,2)*300.+SMCRT_SUB_PASS(i,j,3)*600.+SMCRT_SUB_PASS(i,j,4)*1000,SMCRT_TR_PASS(i,j,1)*100.+SMCRT_TR_PASS(i,j,2)*300.+SMCRT_TR_PASS(i,j,3)*600.+SMCRT_TR_PASS(i,j,4)*1000.
+end if
+!-----------------------
                   call calculate_qsubout_tr(i,j,SATLYRCHK(i,j),NSOIL,NTRACER,PMOPT,NSUB,SLDPTH,&
                                             qqsub,dist(i,j,9),SUBDT,qqsub_tr_lose,qqsub_sub_lose,  &
                                             SMCRT_TR_PASS(i,j,:), SMCRT_SUB_PASS(i,j,:))
-                  qsubrt_tr_gain(ixx0,jyy0) = qsubrt_tr_gain(ixx0,jyy0) - qqsub_tr_lose    ! downstream pixel water gain
-                  qsubrt_sub_gain(ixx0,jyy0)= qsubrt_sub_gain(ixx0,jyy0) - qqsub_sub_lose  ! downstream pixel water gain
-if (i .eq. 79 .and. j .eq. 98 ) then
-!  print *, "FLAG in ROUTE_SUBSURFACE1001, qqsub, qqsub_sub_lose,qqsub_tr_lose:",qqsub, qqsub_sub_lose,qqsub_tr_lose
-!  print *, "SMCRT_SUB_PASS(i,j,:):",SMCRT_SUB_PASS(i,j,:)
+                  do KSOIL  = 1, NSOIL
+                    do KSUB = 1, NSUB(KSOIL)
+                      ISUB  = sum(NSUB(1:KSOIL))-NSUB(KSOIL)+KSUB
+                      qsubrt_tr_gain(ixx0,jyy0,ISUB)  = qsubrt_tr_gain(ixx0,jyy0,ISUB)  - qqsub_tr_lose(ISUB)   ! downstream pixel water gain
+                      qsubrt_sub_gain(ixx0,jyy0,ISUB) = qsubrt_sub_gain(ixx0,jyy0,ISUB) - qqsub_sub_lose(ISUB)  ! downstream pixel water gain
+                    end do
+                  end do
+!-----debug purpose-----
+!if (i .gt. 28 .and. i .le. 32 .and. j .gt. 12 .and. j .le. 16 ) then
+if (i .eq. 1 .and. j .eq. 12) then
+!  print *, "FLAG in ROUTE_SUBSURFACE1001"
+!  print *, "i,j,qqsub,sum(qqsub_sub_lose),sum(qqsub_tr_lose):",i,j,qqsub,sum(qqsub_sub_lose),sum(qqsub_tr_lose)
+!  print *, "sum(SMCRT_SUB_PASS(i,j,:)),sum(SMCRT_TR_PASS(i,j,:)):",SMCRT_SUB_PASS(i,j,1)*100.+SMCRT_SUB_PASS(i,j,2)*300.+SMCRT_SUB_PASS(i,j,3)*600.+SMCRT_SUB_PASS(i,j,4)*1000,SMCRT_TR_PASS(i,j,1)*100.+SMCRT_TR_PASS(i,j,2)*300.+SMCRT_TR_PASS(i,j,3)*600.+SMCRT_TR_PASS(i,j,4)*1000.
+!  print *, "downstream ixx0,jyy0,sum(qsubrt_sub_gain(ixx0,jyy0,:)),sum(qsubrt_tr_gain(ixx0,jyy0,:)):", ixx0,jyy0,sum(qsubrt_sub_gain(ixx0,jyy0,:)),sum(qsubrt_tr_gain(ixx0,jyy0,:))
 end if
-if (ixx0 .eq. 79 .and. jyy0 .eq. 98) then
-!  print *, "FLAG in ROUTE_SUBSURFACE1002, qsubrt_sub_gain(ixx0,jyy0),qqsub,qqsub_sub_lose,qsub_tmp(ixx0,jyy0):",qsubrt_sub_gain(ixx0,jyy0),qqsub,qqsub_sub_lose,qsub_tmp(ixx0,jyy0)
-!  print *, "SMCRT_SUB_PASS(ixx0,jyy0,:):",SMCRT_SUB_PASS(ixx0,jyy0,:)
+if (ixx0 .gt. 28 .and. ixx0 .le. 32 .and. jyy0 .gt. 12 .and. jyy0 .le. 16) then
+!  print *, "FLAG in ROUTE_SUBSURFACE1002"
+!  print *, "ixx0,jyy0,sum(qsubrt_sub_gain(ixx0,jyy0,:)),sum(qsubrt_tr_gain(ixx0,jyy0,:)):",ixx0,jyy0,sum(qsubrt_sub_gain(ixx0,jyy0,:)),sum(qsubrt_tr_gain(ixx0,jyy0,:))
+!  print *, "upstream i,j,qqsub,sum(qqsub_sub_lose),sum(qqsub_tr_lose):",i,j,qqsub,sum(qqsub_sub_lose),sum(qqsub_tr_lose)
 end if
+!----------------------
+                else
+                  qqsub_tr_lose   = 0.0
+                  qqsub_sub_lose  = 0.0
                 end if
               end if
               !-----------------
@@ -1884,16 +1882,34 @@ end if
 #else
               if ((ixx0.eq.1).or.(ixx0.eq.xx).or.(jyy0.eq.1).or.(jyy0.eq.yy)) then
 #endif
+!-----debug purpose-----
+if (ixx0 .eq. 1 .and. jyy0 .eq. 12) then
+!  print *, "FLAG in ROUTE_SUBSURFACE10021"
+!  print *, "ISUB,qqsub, qsub_tmp(ixx0,jyy0):",qqsub, qsub_tmp(ixx0,jyy0)
+end if
+!-----------------------
                 qsub_tmp(ixx0,jyy0) = qsub_tmp(ixx0,jyy0) + qqsub
                 QSUBDRY_tmp(ixx0,jyy0) = QSUBDRY_tmp(ixx0,jyy0) + qqsub
 
                 QSUBDRYT = QSUBDRYT + qqsub
                 !-----wt calc-----
                 if (present(WVTFLAG)) then
-                  qsubrt_tr_gain(ixx0,jyy0) = qsubrt_tr_gain(ixx0,jyy0) + qqsub_tr_lose
-                  qsubrt_sub_gain(ixx0,jyy0)= qsubrt_sub_gain(ixx0,jyy0)+ qqsub_sub_lose
-                  QSUBBDRYRT_TR_PASS(ixx0,jyy0) = QSUBBDRYRT_TR_PASS(ixx0,jyy0) + qqsub_tr_lose
-                  QSUBBDRYTRT_TR_PASS           = QSUBBDRYTRT_TR_PASS + qqsub_tr_lose
+                  do KSOIL  = 1, NSOIL
+                    do KSUB = 1, NSUB(KSOIL)
+                      ISUB  = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+!-----debug purpose-----
+if (ixx0 .eq. 1 .and. jyy0 .eq. 12) then
+!  print *, "FLAG in ROUTE_SUBSURFACE1003" 
+!  print *, "ISUB,qqsub, qsub_tmp(ixx0,jyy0), qqsub_sub_lose(ISUB), qsubrt_tr_gain(ixx0,jyy0,ISUB):",ISUB,qqsub, qsub_tmp(ixx0,jyy0), qqsub_sub_lose(ISUB), qsubrt_tr_gain(ixx0,jyy0,ISUB)
+!  print *, "qqsub_tr_lose(ISUB), qsubrt_tr_gain(ixx0,jyy0,ISUB):", qqsub_tr_lose(ISUB), qsubrt_tr_gain(ixx0,jyy0,ISUB)
+end if
+!-----------------------
+                      qsubrt_tr_gain(ixx0,jyy0, ISUB)    = qsubrt_tr_gain(ixx0,jyy0,ISUB)     + qqsub_tr_lose(ISUB)
+                      qsubrt_sub_gain(ixx0,jyy0,ISUB)    = qsubrt_sub_gain(ixx0,jyy0,ISUB)    + qqsub_sub_lose(ISUB)
+                      QSUBBDRYRT_TR_PASS(ixx0,jyy0,ISUB) = QSUBBDRYRT_TR_PASS(ixx0,jyy0,ISUB) + qqsub_tr_lose(ISUB)
+                      QSUBBDRYTRT_TR_PASS                = QSUBBDRYTRT_TR_PASS + qqsub_tr_lose(ISUB)
+                    end do
+                  end do
                 end if
                 !-----------------
 
@@ -3156,6 +3172,12 @@ END INTERFACE
         if (present(WVTFLAG)) then
           SICE_SUB_PASS = SMC_SUB_PASS-SH2OX_SUB_PASS
           SICE_TR_PASS  = SMC_TR_PASS -SH2OX_TR_PASS
+!----for debug purpose-----
+  print *, "flag01 in disaggregateDomain"
+  print *, "sum(SMC(8,4,:)),sum(SICE(8,4,:)),sum(SH2OX(8,4,:)):", SMC(8,4,1)*100.+SMC(8,4,2)*300.+SMC(8,4,3)*600.+SMC(8,4,4)*1000., SICE(8,4,1)*100.+SICE(8,4,2)*300.+SICE(8,4,3)*600.+SICE(8,4,4)*1000,SH2OX(8,4,1)*100.+SH2OX(8,4,2)*300.+SH2OX(8,4,3)*600.+SH2OX(8,4,4)*1000.
+  print *, "sum(SMC_SUB(8,4,:)),sum(SICE_SUB(8,4,:)),sum(SH2OX_SUB(8,4,:)):", SMC_SUB_PASS(8,4,1)*100.+SMC_SUB_PASS(8,4,2)*300.+SMC_SUB_PASS(8,4,3)*600.+SMC_SUB_PASS(8,4,4)*1000., SICE_SUB_PASS(8,4,1)*100.+SICE_SUB_PASS(8,4,2)*300.+SICE_SUB_PASS(8,4,3)*600.+SICE_SUB_PASS(8,4,4)*1000,SH2OX_SUB_PASS(8,4,1)*100.+SH2OX_SUB_PASS(8,4,2)*300.+SH2OX_SUB_PASS(8,4,3)*600.+SH2OX_SUB_PASS(8,4,4)*1000.
+  print *, "sum(SMC_TR(8,4,:)),sum(SICE_TR(8,4,:)),sum(SH2OX_TR(8,4,:)):", SMC_TR_PASS(8,4,1)*100.+SMC_TR_PASS(8,4,2)*300.+SMC_TR_PASS(8,4,3)*600.+SMC_TR_PASS(8,4,4)*1000., SICE_TR_PASS(8,4,1)*100.+SICE_TR_PASS(8,4,2)*300.+SICE_TR_PASS(8,4,3)*600.+SICE_TR_PASS(8,4,4)*1000,SH2OX_TR_PASS(8,4,1)*100.+SH2OX_TR_PASS(8,4,2)*300.+SH2OX_TR_PASS(8,4,3)*600.+SH2OX_TR_PASS(8,4,4)*1000.
+!--------------------------
         end if
 
 !DJG First, Disaggregate a few key fields for routing...
@@ -3597,8 +3619,8 @@ INTERFACE
          REAL,   OPTIONAL,INTENT(INOUT),DIMENSION(IXRT,JXRT,NTRACER):: SMCMAXRT_SUB_PASS
          REAL,   OPTIONAL,INTENT(INOUT),DIMENSION(IXRT,JXRT)        :: INFXSUBRT_TR_PASS
          REAL,   OPTIONAL,INTENT(INOUT)                             :: QSUBBDRYTRT_TR_PASS
-         REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT)        :: QSUBBDRYRT_TR_PASS
-         REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT)        :: QSUBRT_TR_GAIN
+         REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT,NTRACER):: QSUBBDRYRT_TR_PASS
+         REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT,NTRACER):: QSUBRT_TR_GAIN
 !----------------------------------------------------
   END SUBROUTINE subsurfaceRouting
 END INTERFACE
@@ -3616,8 +3638,8 @@ END INTERFACE
              real, allocatable, dimension(:,:,:)   :: SMCMAXRT_SUB_PASS
              real, allocatable, dimension(:,:)     :: INFXSUBRT_TR_PASS
              REAL                                  :: QSUBBDRYTRT_TR_PASS
-             real, allocatable, dimension(:,:)     :: QSUBBDRYRT_TR_PASS
-             real, allocatable, dimension(:,:)     :: QSUBRT_TR_GAIN
+             real, allocatable, dimension(:,:,:)   :: QSUBBDRYRT_TR_PASS
+             real, allocatable, dimension(:,:,:)   :: QSUBRT_TR_GAIN
 !------------------------------------------------
 
              IF (nlst_rt(did)%SUBRTSWCRT.EQ.1) THEN
@@ -3626,8 +3648,8 @@ END INTERFACE
                 allocate(SMCRT_SUB_PASS     (RT_DOMAIN(did)%ixrt, RT_DOMAIN(did)%jxrt, nlst_rt(did)%NTRACER))
                 allocate(SMCMAXRT_SUB_PASS  (RT_DOMAIN(did)%ixrt, RT_DOMAIN(did)%jxrt, nlst_rt(did)%NTRACER))
                 allocate(INFXSUBRT_TR_PASS  (RT_DOMAIN(did)%ixrt, RT_DOMAIN(did)%jxrt))
-                allocate(QSUBBDRYRT_TR_PASS (RT_DOMAIN(did)%ixrt, RT_DOMAIN(did)%jxrt))
-                allocate(QSUBRT_TR_GAIN     (RT_DOMAIN(did)%ixrt, RT_DOMAIN(did)%jxrt))
+                allocate(QSUBBDRYRT_TR_PASS (RT_DOMAIN(did)%ixrt, RT_DOMAIN(did)%jxrt, nlst_rt(did)%NTRACER))
+                allocate(QSUBRT_TR_GAIN     (RT_DOMAIN(did)%ixrt, RT_DOMAIN(did)%jxrt, nlst_rt(did)%NTRACER))
               
                 call subsurfaceRouting (RT_DOMAIN(did)%ixrt, RT_DOMAIN(did)%jxrt , nlst_rt(did)%nsoil, &
                      RT_DOMAIN(did)%SMCRT,RT_DOMAIN(did)%SMCMAXRT,RT_DOMAIN(did)%SMCREFRT,&
@@ -3739,8 +3761,8 @@ INTERFACE
         INTEGER,OPTIONAL,INTENT(IN)                                :: WVTFLAG
         INTEGER,OPTIONAL,INTENT(IN)                                :: PMOPT
         INTEGER,OPTIONAL,INTENT(IN),   DIMENSION(NSOIL)            :: NSUB
-        REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT)        :: QSUBBDRYRT_TR_PASS
-        REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT)        :: QSUBRT_TR_GAIN
+        REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT,NTRACER):: QSUBBDRYRT_TR_PASS
+        REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT,NTRACER):: QSUBRT_TR_GAIN
         REAL,   OPTIONAL,INTENT(INOUT)                             :: QSUBBDRYTRT_TR_PASS
         REAL,   OPTIONAL,INTENT(INOUT),DIMENSION(IXRT,JXRT)        :: INFXSUBRT_TR_PASS
         REAL,   OPTIONAL,INTENT(INOUT),DIMENSION(IXRT,JXRT,NTRACER):: SMCRT_TR_PASS
@@ -3776,8 +3798,8 @@ END INTERFACE
          REAL,   OPTIONAL,INTENT(INOUT),DIMENSION(IXRT,JXRT,NTRACER):: SMCMAXRT_SUB_PASS
          REAL,   OPTIONAL,INTENT(INOUT),DIMENSION(IXRT,JXRT)        :: INFXSUBRT_TR_PASS
          REAL,   OPTIONAL,INTENT(INOUT)                             :: QSUBBDRYTRT_TR_PASS
-         REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT)        :: QSUBBDRYRT_TR_PASS
-         REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT)        :: QSUBRT_TR_GAIN
+         REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT,NTRACER):: QSUBBDRYRT_TR_PASS
+         REAL,   OPTIONAL,INTENT(OUT),  DIMENSION(IXRT,JXRT,NTRACER):: QSUBRT_TR_GAIN
 !----------------------------------------------------
 
 !  -----local array ----------
@@ -4153,6 +4175,534 @@ subroutine calculate_wt_ratio_pm (a,b,c)
   end if
 
 end subroutine
+
+!-----------------------------------------------------
+! Huancui Hu: implement_tracerflow_bottom2top
+subroutine implement_tracerflow_bottom2top(I,J, NSOIL, NTRACER, SLDPTH, NSUB, &
+                                     smc, smc_sub, smc_tr,        &
+                                     subflo_init, subflo_sub, subflo_tr, &
+                                     infxsubrt_tr_fill, infxsubrt_tr)
+
+  implicit none
+  integer, intent(in)                       :: I,J
+  integer, intent(in)                       :: NSOIL
+  integer, intent(in)                       :: NTRACER
+  real,    intent(in),   dimension(NSOIL)   :: SLDPTH
+  integer, intent(in),   dimension(NSOIL)   :: NSUB
+  real,    intent(in),   dimension(NSOIL)   :: smc
+  real,    intent(inout),dimension(NTRACER) :: smc_sub
+  real,    intent(inout),dimension(NTRACER) :: smc_tr
+  real,    intent(in)                       :: subflo_init
+  real,    intent(inout),dimension(NTRACER) :: subflo_sub
+  real,    intent(inout),dimension(NTRACER) :: subflo_tr
+  integer, intent(in)                       :: infxsubrt_tr_fill
+  real,    intent(inout)                    :: infxsubrt_tr
+  !----local vars----
+  real                      :: subflo_sub_sum
+  real                      :: subflo_tr_sum
+  integer                   :: KSOIL, KSUB, ISUB
+  real                      :: PROPOR_TR
+  real                      :: dsmc_tmp
+  real                      :: smc_residual
+  !---------------------
+
+  !initialize vars
+  dsmc_tmp       =  0.0
+  subflo_sub_sum =  0.0
+  subflo_tr_sum  =  0.0
+
+ 
+     ! sum up nlayer sub and tracer flow
+  do KSOIL = 1, NSOIL
+    do KSUB = 1, NSUB(KSOIL)
+      ISUB = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+      subflo_sub_sum = subflo_sub_sum + subflo_sub(ISUB)     !unit:m
+      subflo_tr_sum  = subflo_tr_sum  + subflo_tr(ISUB)
+    end do
+  end do
+
+if (I .eq. 44 .and. J .eq. 34) then
+  print *, "flag01 in implement_tracerflow_bottom2top"
+  print *, "subflo_init,subflo_sub_sum, subflo_tr_sum, infxsubrt_tr_fill",subflo_init,subflo_sub_sum, subflo_tr_sum, infxsubrt_tr_fill
+  print *, "sum(smc),sum(smc_sub),sun(smc_tr):",smc(1)*100.+smc(2)*300.+smc(3)*600.+smc(4)*1000.,smc_sub(1)*100.+smc_sub(2)*300.+smc_sub(3)*600.+smc_sub(4)*1000.,smc_tr(1)*100.+smc_tr(2)*300.+smc_tr(3)*600.+smc_tr(4)*1000.
+  print *, "smc, smc_sub, smc_tr:", smc, smc_sub, smc_tr
+end if
+
+  do KSOIL = NSOIL, 1, -1
+    do KSUB = NSUB(KSOIL), 1,-1
+      ISUB  = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+      if (subflo_sub_sum .gt. 1.0e-6) then
+        smc_sub(ISUB) = smc_sub(ISUB) + subflo_sub_sum/(SLDPTH(KSOIL)/NSUB(KSOIL))
+        smc_tr(ISUB)  = smc_tr(ISUB)  + subflo_tr_sum/(SLDPTH(KSOIL)/NSUB(KSOIL))
+        call calculate_wt_ratio(smc_tr(ISUB), smc_sub(ISUB), PROPOR_TR)
+        dsmc_tmp      = smc(KSOIL) - smc_sub(ISUB)
+        if (dsmc_tmp .gt. 1.0e-8) then   !means need downward flow
+          subflo_sub_sum  = 0.0
+          subflo_tr_sum   = 0.0
+        else
+          if (abs(dsmc_tmp) .le. 1.0e-8) then
+            smc_sub(ISUB) = smc(KSOIL)
+            smc_tr(ISUB)  = min(max(0.0,smc_tr(ISUB)), smc_sub(ISUB))
+          else !dsmc_tmp < 0
+            smc_sub(ISUB)  = smc(KSOIL)
+            smc_tr(ISUB)   = smc_sub(ISUB) * PROPOR_TR
+            subflo_sub_sum = 0.0 - dsmc_tmp*(SLDPTH(KSOIL)/NSUB(KSOIL))   !becomes positive
+            subflo_tr_sum  = subflo_sub_sum* PROPOR_TR
+          end if
+        end if
+      else
+        if (abs(subflo_sub_sum) .le. 1.0e-6) then
+          subflo_sub_sum = 0.0
+          subflo_tr_sum  = 0.0
+        else !subflo_sub_sum < 0
+          print *, "ERROR 1 in implement_tracerflow_bottom2top"
+        end if      
+      end if
+    end do
+  end do
+
+  ! now the adjustment due to upstream flow is done
+  ! may have all saturaed layers
+  if (subflo_sub_sum .gt. 1.0e-6) then
+    if (infxsubrt_tr_fill  .eq. 1) then  !sanity check
+      infxsubrt_tr    = infxsubrt_tr + subflo_tr_sum*1000.   !unit:mm
+      subflo_sub_sum  = 0.0
+      subflo_tr_sum   = 0.0
+    else
+      print *, "ERROR 3 in implement_tracerflow_bottom2top"
+      print *, "I,J,subflo_sub_sum,infxsubrt_tr_fill,subflo_sub:",I,J,subflo_sub_sum,infxsubrt_tr_fill,subflo_sub
+    end if
+  else
+    !----do soil moisture adjustment downward-----
+    call adjust_smc_downward(I,J,NSOIL, NTRACER, SLDPTH, NSUB, smc, smc_sub, smc_tr, smc_residual)
+    if (abs(smc_residual)  .gt. 1.0e-6) then
+      print *, "ERROR 4 in implement_tracerflow_bottom2top"
+    end if
+  end if
+
+end subroutine implement_tracerflow_bottom2top
+!-----------------------------------------------------
+! Huancui Hu: implement_tracerflow_laminar
+subroutine implement_tracerflow_laminar(I,J, NSOIL, NTRACER, SLDPTH, NSUB, &
+                                     smc, smc_sub, smc_tr,        &
+                                     subflo_init, subflo_sub, subflo_tr, &
+                                     infxsubrt_tr_fill, infxsubrt_tr)
+
+  implicit none
+  integer, intent(in)                       :: I,J
+  integer, intent(in)                       :: NSOIL
+  integer, intent(in)                       :: NTRACER
+  real,    intent(in),   dimension(NSOIL)   :: SLDPTH
+  integer, intent(in),   dimension(NSOIL)   :: NSUB
+  real,    intent(in),   dimension(NSOIL)   :: smc
+  real,    intent(inout),dimension(NTRACER) :: smc_sub
+  real,    intent(inout),dimension(NTRACER) :: smc_tr
+  real,    intent(in)                       :: subflo_init
+  real,    intent(inout),dimension(NTRACER) :: subflo_sub
+  real,    intent(inout),dimension(NTRACER) :: subflo_tr
+  integer, intent(in)                       :: infxsubrt_tr_fill
+  real,    intent(inout)                    :: infxsubrt_tr
+  !-----local vars------
+  real                      :: subflo_sub_sum
+  real                      :: subflo_tr_sum
+  integer                   :: KSOIL, KSUB, ISUB
+  real                      :: PROPOR_TR
+  real                      :: dsmc_tmp, dwater_avail
+  real                      :: smc_residual
+  real, dimension(NTRACER)  :: sldpth_sub
+  !---------------------
+
+  print *, "FLAG 1 IN implement_tracerflow_laminar"
+  dsmc_tmp = 0.0
+  subflo_sub_sum = 0.0       !not used
+  subflo_tr_sum  = 0.0       !not used
+  sldpth_sub          = 0.0
+  do KSOIL = 1, NSOIL
+    do KSUB = 1, NSUB(KSOIL)
+      ISUB  = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+      sldpth_sub(ISUB) = SLDPTH(KSOIL)/NSUB(KSOIL)
+    end do
+  end do
+
+  ! add the subflo_sub upstreamflow to each layer
+  do KSOIL = 1, NSOIL
+    do KSUB = 1, NSUB(KSOIL)
+      ISUB = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+      smc_sub(ISUB)  = smc_sub(ISUB) + subflo_sub(ISUB)/(SLDPTH(KSOIL)/NSUB(KSOIL))     !unit:m3/m3
+      smc_tr(ISUB)   = smc_tr(ISUB)  + subflo_tr(ISUB)/(SLDPTH(KSOIL)/NSUB(KSOIL))
+    end do
+  end do
+
+  print *, "FLAG 2 IN implement_tracerflow_laminar"
+
+  ! now start to adjust soil moisture from bottom to top first
+  do KSOIL = NSOIL, 1, -1
+    do KSUB = NSUB(KSOIL), 1, -1
+      ISUB  = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) - KSUB
+      dsmc_tmp = smc(KSOIL) - smc_sub(ISUB)
+      if (dsmc_tmp .gt. 1.0e-8) then   
+        !needs downward flow
+      else
+        if (abs(dsmc_tmp) .lt. 1.0e-8) then
+          smc_sub(ISUB) = smc(KSOIL)
+          smc_tr(ISUB)  = min(max(0.0, smc_tr(ISUB)), smc_sub(ISUB))
+        else  !dsmc_tmp < 0
+          call calculate_wt_ratio(smc_tr(ISUB), smc_sub(ISUB), PROPOR_TR)
+          smc_sub(ISUB) = smc(KSOIL)
+          smc_tr(ISUB)  = smc_tr(ISUB) + dsmc_tmp*PROPOR_TR
+          if (ISUB .gt. 1) then
+            smc_sub(ISUB-1) = smc_sub(ISUB-1) - dsmc_tmp*sldpth_sub(ISUB)/sldpth_sub(ISUB-1)
+            smc_tr(ISUB-1)  = smc_tr(ISUB-1)  - dsmc_tmp*sldpth_sub(ISUB)*PROPOR_TR/sldpth_sub(ISUB-1)
+          else !ISUB = 1, meaning there is saturated flow
+            if (infxsubrt_tr_fill .eq. 1) then
+              infxsubrt_tr  = infxsubrt_tr - dsmc_tmp*sldpth_sub(ISUB)*PROPOR_TR*1000.  !unit:mm
+            else
+              print *, "ERROR 1 in implement_tracerflow_laminar"
+            end if
+          end if 
+        end if   
+      end if
+    end do
+  end do
+
+  print *, "FLAG 3 IN implement_tracerflow_laminar"
+
+  ! do soil moisture adjustment from top to bottom then
+  call adjust_smc_downward(I,J,NSOIL,NTRACER, SLDPTH, NSUB, smc, smc_sub, smc_tr, smc_residual)
+  if (abs(smc_residual) .gt. 1.0e-6) then
+    print *, "ERROR 2 in implement_tracerflow_laminar"
+  end if
+
+end subroutine implement_tracerflow_laminar
+!-----------------------------------------------------
+! Huancui Hu: implement_tracerflow_up2bottom 
+subroutine implement_tracerflow_top2bottom(I,J, NSOIL, NTRACER, SLDPTH, NSUB, &
+                                     smc, smc_sub, smc_tr,        &
+                                     subflo_init, subflo_sub, subflo_tr, &
+                                     infxsubrt_tr_fill,subflo_excess, infxsubrt_tr)
+
+  implicit none
+  integer, intent(in)                       :: I,J
+  integer, intent(in)                       :: NSOIL
+  integer, intent(in)                       :: NTRACER
+  real,    intent(in),   dimension(NSOIL)   :: SLDPTH
+  integer, intent(in),   dimension(NSOIL)   :: NSUB
+  real,    intent(in),   dimension(NSOIL)   :: smc
+  real,    intent(inout),dimension(NTRACER) :: smc_sub
+  real,    intent(inout),dimension(NTRACER) :: smc_tr
+  real,    intent(in)                       :: subflo_init
+  real,    intent(inout),dimension(NTRACER) :: subflo_sub
+  real,    intent(inout),dimension(NTRACER) :: subflo_tr
+  integer, intent(in)                       :: infxsubrt_tr_fill
+  real,    intent(in)                       :: subflo_excess      !unit:m
+  real,    intent(inout)                    :: infxsubrt_tr       !unit:mm
+  !-----local vars------
+  real                      :: subflo_sub_sum
+  real                      :: subflo_tr_sum
+  integer                   :: KSOIL, KSUB, ISUB
+  real                      :: PROPOR_TR
+  real                      :: dsmc_tmp, dwater_avail
+  real                      :: smc_residual
+  !---------------------
+
+  dsmc_tmp = 0.0
+  subflo_sub_sum = 0.0
+  subflo_tr_sum  = 0.0
+  
+
+  ! sum up nlayer sub and tracer flow
+  do KSOIL = 1, NSOIL
+    do KSUB = 1, NSUB(KSOIL)
+      ISUB = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+      subflo_sub_sum = subflo_sub_sum + subflo_sub(ISUB)     !unit:m
+      subflo_tr_sum  = subflo_tr_sum  + subflo_tr(ISUB)
+    end do
+  end do
+  call calculate_wt_ratio(subflo_tr_sum, subflo_sub_sum, PROPOR_TR)
+  
+  ! add subflo_sub_sum and subflo_sub_tr to the top soil layer
+  if (subflo_sub_sum .gt. 1.0e-6) then
+    if (infxsubrt_tr_fill .eq. 1) then
+       subflo_sub_sum  = subflo_sub_sum - subflo_excess
+       subflo_tr_sum   = subflo_tr_sum  - subflo_excess*PROPOR_TR
+       infxsubrt_tr    = infxsubrt_tr   + subflo_excess*PROPOR_TR*1000.0   !unit:mm
+    else
+    end if
+    smc_sub(1)   = smc_sub(1) + subflo_sub_sum/(SLDPTH(1)/NSUB(1))  !unit:m3/m3
+    smc_tr(1)    = smc_tr(1)  + subflo_tr_sum/(SLDPTH(1)/NSUB(1))
+  else
+    if (abs(subflo_sub_sum) .le. 1.0e-6) then
+      subflo_sub_sum   = 0.0
+      subflo_tr_sum    = 0.0
+    else
+      print *, "ERROR 1 in implement_tracerflow_up2bottom"
+    end if
+  end if
+
+  ! do soil moisture adjustment from top to bottom then
+  call adjust_smc_downward(I,J,NSOIL, NTRACER, SLDPTH, NSUB, smc, smc_sub, smc_tr, smc_residual)
+  if (abs(smc_residual) .gt. 1.0e-6) then
+    print *, "ERROR 2 in implement_tracerflow_up2bottom"
+  end if
+
+end subroutine implement_tracerflow_top2bottom
+!-----------------------------------------------------
+! Huancui Hu: implement_tracerflow_fill
+subroutine implement_tracerflow_fill(I,J, NSOIL, NTRACER, SLDPTH, NSUB, &
+                                     smc, smc_sub, smc_tr,        &
+                                     subflo_init, subflo_sub, subflo_tr, &
+                                     infxsubrt_tr_fill, infxsubrt_tr)
+
+  implicit none
+  integer, intent(in)                       :: I,J
+  integer, intent(in)                       :: NSOIL
+  integer, intent(in)                       :: NTRACER
+  real,    intent(in),   dimension(NSOIL)   :: SLDPTH
+  integer, intent(in),   dimension(NSOIL)   :: NSUB
+  real,    intent(in),   dimension(NSOIL)   :: smc
+  real,    intent(inout),dimension(NTRACER) :: smc_sub
+  real,    intent(inout),dimension(NTRACER) :: smc_tr
+  real,    intent(in)                       :: subflo_init
+  real,    intent(inout),dimension(NTRACER) :: subflo_sub
+  real,    intent(inout),dimension(NTRACER) :: subflo_tr
+  integer, intent(in)                       :: infxsubrt_tr_fill
+  real,    intent(inout)                    :: infxsubrt_tr
+  !-----local vars------
+  real                      :: subflo_sub_sum
+  real                      :: subflo_tr_sum
+  integer                   :: KSOIL, KSUB, ISUB
+  real                      :: PROPOR_TR
+  real                      :: dsmc_tmp, dwater_avail
+  real                      :: smc_residual
+  !---------------------
+
+  ! initialize vars
+  dsmc_tmp = 0.0
+  subflo_sub_sum = 0.0
+  subflo_tr_sum  = 0.0
+
+  ! sum up nlayer sub and tracer flow
+  do KSOIL = 1, NSOIL
+    do KSUB = 1, NSUB(KSOIL)
+      ISUB = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+      subflo_sub_sum = subflo_sub_sum + subflo_sub(ISUB)     !unit:m
+      subflo_tr_sum  = subflo_tr_sum  + subflo_tr(ISUB)
+    end do
+  end do
+
+if (I .eq. 1 .and. J .eq. 12) then
+  print *, "flag01 in implement_tracerflow_fill"
+  print *, "subflo_init,subflo_sub_sum, subflo_tr_sum, infxsubrt_tr_fill",subflo_init,subflo_sub_sum, subflo_tr_sum, infxsubrt_tr_fill
+  print *, "sum(smc),sum(smc_sub),sun(smc_tr):",smc(1)*100.+smc(2)*300.+smc(3)*600.+smc(4)*1000.,smc_sub(1)*100.+smc_sub(2)*300.+smc_sub(3)*600.+smc_sub(4)*1000.,smc_tr(1)*100.+smc_tr(2)*300.+smc_tr(3)*600.+smc_tr(4)*1000.
+end if
+  
+  do KSOIL = NSOIL, 1, -1
+    do KSUB = NSUB(KSOIL), 1, -1
+      ISUB  = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+!-----debug purpose-----
+if (I .eq. 1 .and. J .eq. 12) then
+  print *, "flag001 in implement_tracerflow_fill"
+  print *, "ISUB, smc(KSOIL), smc_sub(ISUB), smc_tr(ISUB):",ISUB, smc(KSOIL), smc_sub(ISUB), smc_tr(ISUB)
+  print *, "subflo_sub_sum:", subflo_sub_sum
+end if
+!-----------------------
+      if (subflo_sub_sum .gt. 1.0e-8) then
+        dsmc_tmp      = smc(KSOIL) - smc_sub(ISUB)
+        dwater_avail  = dsmc_tmp*SLDPTH(KSOIL)/NSUB(KSOIL)
+        if (dsmc_tmp .gt. 1.0e-8) then
+          if (dwater_avail .le. subflo_sub_sum ) then
+            call calculate_wt_ratio(subflo_tr_sum, subflo_sub_sum, PROPOR_TR)
+            subflo_sub_sum = subflo_sub_sum - dwater_avail
+            subflo_tr_sum  = subflo_tr_sum  - dwater_avail*PROPOR_TR
+            smc_sub(ISUB)  = smc(KSOIL)
+            smc_tr(ISUB)   = smc_tr(KSOIL)  + dsmc_tmp*PROPOR_TR
+          else  !gain from upstream flow is not sufficient to cover soil moisture change, need uplayer soil moiture to fill
+            smc_sub(ISUB)  = smc_sub(ISUB)  + subflo_sub_sum/SLDPTH(KSOIL) !/NSUB(KSOIL)*NSUB(KSOIL) m3/m3
+            smc_tr(ISUB)   = smc_tr(ISUB)   + subflo_tr_sum/SLDPTH(KSOIL)
+            subflo_sub_sum = 0.0
+            subflo_tr_sum  = 0.0
+          end if
+        else
+          if (abs(dsmc_tmp) .le. 1.0e-8) then
+            smc_sub(ISUB) = smc(KSOIL)
+            smc_tr(ISUB)  = min(max(0.0,smc_tr(ISUB)), smc_sub(ISUB))
+          else !dsmc_tmp<0,smc_sub need to lose some water
+            call calculate_wt_ratio(smc_tr(ISUB), smc_sub(ISUB), PROPOR_TR)
+            smc_sub(ISUB)  = smc(KSOIL)
+            smc_tr(ISUB)   = smc_tr(ISUB)   + dsmc_tmp*PROPOR_TR
+            subflo_sub_sum = subflo_sub_sum - dwater_avail   !dwater_avail<0, subflo_sub_sum will increase
+            subflo_tr_sum  = subflo_tr_sum  - dwater_avail*PROPOR_TR   
+          end if
+        end if
+      else
+        if ((abs(subflo_sub_sum) .lt. 1.0e-8)) then
+          subflo_sub_sum   = 0.0
+          subflo_tr_sum    = 0.0
+        else
+          print *, "ERROR 2 in implement_tracerflow_fill"
+        end if
+      end if
+
+!-----debug purpose-----
+if (I .eq. 1 .and. J .eq. 12) then
+  print *, "flag001 in implement_tracerflow_fill"
+  print *, "ISUB, smc(KSOIL), smc_sub(ISUB), smc_tr(ISUB):",ISUB, smc(KSOIL), smc_sub(ISUB), smc_tr(ISUB)
+  print *, "subflo_sub_sum:", subflo_sub_sum
+end if
+!-----------------------
+
+    end do
+  end do
+
+if (I .eq. 30 .and. J .eq. 18) then
+  print *, "flag02 in implement_tracerflow_fill"
+  print *, "subflo_sub_sum, subflo_tr_sum,infxsubrt_tr_fill,subflo_init,smc,smc_sub,smc_tr:",subflo_sub_sum, subflo_tr_sum,infxsubrt_tr_fill,subflo_init,smc,smc_sub,smc_tr
+end if
+
+  ! now the adjustment due to upstream flow is done
+  ! may have all saturaed layers
+  if (subflo_sub_sum .gt. 1.0e-6) then
+    if (infxsubrt_tr_fill  .eq. 1) then  !sanity check
+      infxsubrt_tr    = infxsubrt_tr + subflo_tr_sum*1000.   !unit:mm
+      subflo_sub_sum  = 0.0
+      subflo_tr_sum   = 0.0
+    else
+      print *, "ERROR 3 in implement_tracerflow_fill"
+!----debug purpose----
+      print *, "I, J, ISUB, subflo_sub_sum, subflo_tr_sum, smc, smc_sub, smc_tr, infxsubrt_tr_fill:"
+      print *, I, J, ISUB, subflo_sub_sum, subflo_tr_sum, smc, smc_sub, smc_tr, infxsubrt_tr_fill
+    end if
+  else
+    !----do soil moisture adjustment downward-----
+    call adjust_smc_downward(I,J,NSOIL, NTRACER, SLDPTH, NSUB, smc, smc_sub, smc_tr, smc_residual)
+    if (abs(smc_residual) .gt. 1.0e-6) then
+      print *, "ERROR 4 in implement_tracerflow_fill"
+    end if
+  end if
+
+if (I .eq. 30 .and. J .eq. 18) then
+  print *, "flag03 in implement_tracerflow_fill"
+  print *, "subflo_sub_sum, subflo_tr_sum,infxsubrt_tr_fill,subflo_init,smc,smc_sub,smc_tr:",subflo_sub_sum, subflo_tr_sum,infxsubrt_tr_fill,subflo_init,smc,smc_sub,smc_tr
+end if
+
+
+end subroutine implement_tracerflow_fill
+!------------------------------------------------------
+! Huancui Hu: adjust_smc_downward
+subroutine adjust_smc_downward(I, J, NSOIL, NTRACER, SLDPTH, NSUB,  &
+                               smc, smc_sub, smc_tr, smc_residual)
+  
+  implicit none
+  integer, intent(in)                       :: I,J
+  integer, intent(in)                       :: NSOIL
+  integer, intent(in)                       :: NTRACER
+  real,    intent(in),   dimension(NSOIL)   :: SLDPTH
+  integer, intent(in),   dimension(NSOIL)   :: NSUB
+  real,    intent(in),   dimension(NSOIL)   :: smc
+  real,    intent(inout),dimension(NTRACER) :: smc_sub
+  real,    intent(inout),dimension(NTRACER) :: smc_tr
+  real,    intent(out)                      :: smc_residual
+  !----local vars-----
+  INTEGER             :: KSOIL, KSUB, ISUB
+  real                :: PROPOR_TR
+  real                :: dsmc_tmp
+  real, dimension(NTRACER)    :: sldpth_sub
+  INTEGER, dimension(NTRACER) :: solve_flag
+  real                        :: water_sub_extra, water_tr_extra
+
+  smc_residual        = 0.0
+  sldpth_sub          = 0.0
+  do KSOIL = 1, NSOIL
+    do KSUB = 1, NSUB(KSOIL)
+      ISUB  = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+      sldpth_sub(ISUB) = SLDPTH(KSOIL)/NSUB(KSOIL)
+    end do
+  end do
+
+  solve_flag      = 0
+  water_sub_extra = 0.0
+  water_tr_extra  = 0.0
+  do KSOIL = 1, NSOIL
+    do KSUB = 1, NSUB(KSOIL)
+      ISUB  = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+      dsmc_tmp = smc(KSOIL) - smc_sub(ISUB)
+      if (dsmc_tmp .gt. 1.0e-6) then
+        !it is possible to have smc>smc_sub because smc can only be adjusted to reference soil moisture then use the lower levels for drainage
+        solve_flag(ISUB) = 1
+      else
+        if (abs(dsmc_tmp) .le. 1.0e-6) then
+          smc_sub(ISUB) = smc(KSOIL)
+          smc_tr(ISUB)  = min(max(0.0,smc_tr(ISUB)), smc_sub(ISUB))
+        else !dsmc_tmp <0
+          call calculate_wt_ratio(smc_tr(ISUB), smc_sub(ISUB), PROPOR_TR)
+          smc_sub(ISUB)    = smc(KSOIL)
+          smc_tr(ISUB)     = smc_tr(ISUB)  + dsmc_tmp*PROPOR_TR
+          water_sub_extra  = water_sub_extra - dsmc_tmp*sldpth_sub(ISUB)              !unit:m
+          water_tr_extra   = water_tr_extra  - dsmc_tmp*sldpth_sub(ISUB)*PROPOR_TR    !unit:m
+        end if
+      end if
+    end do
+  end do
+
+  do KSOIL = 1, NSOIL
+    do KSUB = 1, NSUB(KSOIL)
+      ISUB  = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+      if (solve_flag(ISUB) .eq. 1) then
+        if (water_sub_extra .lt. -1.0e-6) then
+          print *, "ERROR 1 in adjust_smc_downward"
+        else
+          if (abs(water_sub_extra) .lt. 1.0e-6) then
+            smc_sub(ISUB) = smc(KSOIL)
+            smc_tr(ISUB)  = min(max(0.0,smc_tr(ISUB)), smc_sub(ISUB))
+          else     !smc>smc_sub
+            call calculate_wt_ratio(water_tr_extra, water_sub_extra, PROPOR_TR)
+            dsmc_tmp       = smc(KSOIL) - smc_sub(ISUB)     !dsmc_tmp>0
+            smc_sub(ISUB)  = smc(KSOIL)
+            smc_tr(ISUB)   = smc_tr(ISUB) + dsmc_tmp*PROPOR_TR
+            water_sub_extra = water_sub_extra - dsmc_tmp*sldpth_sub(ISUB)
+            water_tr_extra  = water_tr_extra  - dsmc_tmp*sldpth_sub(ISUB)*PROPOR_TR
+          end if
+        end if
+        solve_flag(ISUB)  = 0
+      end if
+    end do
+  end do
+
+  do KSOIL = 1, NSOIL
+    do KSUB = 1, NSUB(KSOIL)
+      ISUB  = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+      if (solve_flag(ISUB)  .ne. 0) then
+        print *, "ERROR 2 in adjust_smc_downward"
+      end if
+    end do
+  end do
+  !-----calculate soil moisture residual-----
+  call calculate_smc_residual(NSOIL, NTRACER, SLDPTH, NSUB, smc,smc_sub, smc_residual)
+      
+end subroutine adjust_smc_downward
+!------------------------------------------------------  
+! Huancui Hu: calculate_smc_residual
+subroutine calculate_smc_residual(NSOIL, NTRACER, SLDPTH, NSUB, smc, smc_sub, smc_residual)
+  implicit none
+  integer, intent(in)                       :: NSOIL
+  integer, intent(in)                       :: NTRACER
+  real,    intent(in),   dimension(NSOIL)   :: SLDPTH
+  integer, intent(in),   dimension(NSOIL)   :: NSUB
+  real,    intent(in),   dimension(NSOIL)   :: smc
+  real,    intent(inout),dimension(NTRACER) :: smc_sub
+  real,    intent(inout)                    :: smc_residual
+  !----local vars-----
+  integer                :: KSOIL, KSUB, ISUB
+
+  smc_residual = 0.0
+  do KSOIL = NSOIL, 1, -1
+    do KSUB = NSUB(KSOIL), 1, -1
+      ISUB  = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
+      smc_residual = smc_residual + abs(smc(KSOIL) - smc_sub(ISUB))*SLDPTH(KSOIL)/NSUB(KSOIL)  !unit:m
+    end do
+  end do
+
+end subroutine calculate_smc_residual
 !------------------------------------------------------
 ! Huancui Hu: adjust_smc_tr
 subroutine adjust_smc_tr(I,J,NSOIL, NTRACER, SLDPTH, NSUB, Ksat_ini,&
@@ -4381,8 +4931,8 @@ subroutine calculate_qsubout_tr(ii, jj, satk,nsoil,ntracer,pmopt,nsub,sldepth,&
   real,    intent(in)                            :: qqsub_lose     !unit:m3/s, has to be <0
   real,    intent(in)                            :: grid_area     !unit:m2
   real,    intent(in)                            :: subdt    
-  real,    intent(out)                           :: qqsub_tr_lose
-  real,    intent(out)                           :: qqsub_sub_lose
+  real,    intent(out),  dimension(ntracer)      :: qqsub_tr_lose
+  real,    intent(out),  dimension(ntracer)      :: qqsub_sub_lose
   real,    intent(inout),dimension(ntracer)      :: smc_tr
   real,    intent(inout),dimension(ntracer)      :: smc_sub
   !-----local vars-----
@@ -4399,38 +4949,38 @@ subroutine calculate_qsubout_tr(ii, jj, satk,nsoil,ntracer,pmopt,nsub,sldepth,&
     qqsub_sub_tmp = qqsub_lose*sldepth(K)/sum(sldepth(satk:nsoil))    !qqsub_sub_tmp<0
     do KSUB = 1, NSUB(K)
       ISUB = sum(NSUB(1:K)) - NSUB(K) + KSUB
-      if (pmopt .lt. 2) then
-        call calculate_wt_ratio(smc_tr(ISUB), smc_sub(ISUB), PROPOR_TR)
-      else
+      if (pmopt .eq. 2) then
         call calculate_wt_ratio_pm(smc_tr(ISUB), smc_sub(ISUB), PROPOR_TR)
+      else
+        call calculate_wt_ratio(smc_tr(ISUB), smc_sub(ISUB), PROPOR_TR)
       end if
-      qqsub_tr_lose  = qqsub_tr_lose + qqsub_sub_tmp/NSUB(K)*PROPOR_TR
-      smc_tr(ISUB)   = smc_tr(ISUB)  + (qqsub_sub_tmp/grid_area*subdt)/(sldepth(K)/NSUB(K))*PROPOR_TR
-      qqsub_sub_lose = qqsub_sub_lose + qqsub_sub_tmp/NSUB(K)
-      smc_sub(ISUB)  = smc_sub(ISUB) + (qqsub_sub_tmp/grid_area*subdt)/(sldepth(K)/NSUB(K))
+      qqsub_tr_lose(ISUB)  = qqsub_tr_lose(ISUB)  + qqsub_sub_tmp/NSUB(K)*PROPOR_TR
+      smc_tr(ISUB)         = smc_tr(ISUB)  + (qqsub_sub_tmp/grid_area*subdt)/sldepth(K)*PROPOR_TR
+      qqsub_sub_lose(ISUB) = qqsub_sub_lose(ISUB) + qqsub_sub_tmp/NSUB(K)
+      smc_sub(ISUB)        = smc_sub(ISUB) + (qqsub_sub_tmp/grid_area*subdt)/sldepth(K)
       if (smc_tr(ISUB) .lt. -1.0E-8) then
         print *, "ERROR in calculate_qsubout_tr00, smc_tr<0,ii,jj,pmopt,PROPOR_TR,smc_tr,smc_sub:",ii,jj,pmopt,PROPOR_TR,smc_tr,smc_sub 
       end if
     end do 
   end do
-  if (abs(qqsub_sub_lose - qqsub_lose) .gt. 1.5E-7 ) then
+  if (abs(sum(qqsub_sub_lose(1:NTRACER)) - qqsub_lose) .gt. 1.5E-7 ) then
     if (abs(qqsub_lose) .lt. 1.0) then
       print *, "ERROR in calculate_qsubout_tr!"
       print *, "satk, nsoil, qqsub_lose, qqsub_sub_lose:"
       print *, ii,jj, satk, nsoil, qqsub_lose, qqsub_sub_lose
     else
-      if (abs(qqsub_sub_lose - qqsub_lose) .gt. 1.5E-6) then
+      if (abs(sum(qqsub_sub_lose(1:NTRACER)) - qqsub_lose) .gt. 1.5E-6) then
         print *, "ERROR in calculate_qsubout_tr!"
         print *, "satk, nsoil, qqsub_lose, qqsub_sub_lose:"
         print *, ii,jj,satk, nsoil, qqsub_lose, qqsub_sub_lose 
       else
-        qqsub_sub_lose = qqsub_lose
-        qqsub_tr_lose  = max(qqsub_tr_lose, qqsub_lose)      ! is negative
+!        qqsub_sub_lose = qqsub_lose
+!        qqsub_tr_lose  = max(qqsub_tr_lose, qqsub_lose)      ! is negative
       end if
     end if
   else
-    qqsub_sub_lose = qqsub_lose
-    qqsub_tr_lose  = max(qqsub_tr_lose, qqsub_lose)      ! is negative
+!    qqsub_sub_lose = qqsub_lose
+!    qqsub_tr_lose  = max(qqsub_tr_lose, qqsub_lose)      ! is negative
   end if
 end subroutine calculate_qsubout_tr
 !------------------------------------------------------

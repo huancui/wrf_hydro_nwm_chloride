@@ -196,9 +196,9 @@ CONTAINS
      rt_domain(did)%INFXSWGT_TR    = 0.0
      allocate( rt_domain(did)%SH2OWGT_TR     (IXRT,JXRT,NTRACER) )
      rt_domain(did)%SH2OWGT_TR     = 0.0
-     allocate( rt_domain(did)%QSUBRT_TR      (IXRT,JXRT) )
+     allocate( rt_domain(did)%QSUBRT_TR      (IXRT,JXRT,NTRACER) )
      rt_domain(did)%QSUBRT_TR      = 0.0
-     allocate( rt_domain(did)%QSUBBDRYRT_TR  (IXRT,JXRT) )
+     allocate( rt_domain(did)%QSUBBDRYRT_TR  (IXRT,JXRT,NTRACER) )
      rt_domain(did)%QSUBBDRYRT  = 0.0
      allocate( rt_domain(did)%q_sfcflx_x_tr  (IXRT,JXRT) )
      rt_domain(did)%q_sfcflx_x_tr  = 0.0

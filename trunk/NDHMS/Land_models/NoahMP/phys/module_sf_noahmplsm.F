@@ -704,8 +704,8 @@ contains
 !-----tag precip as water tracer------
 !print *, "FLAG0003"
    if (present(wvt_ratio)) then
-     call tag_precip(RAIN, wvt_ratio*CL_CC_PASS, RAIN_TR)
-     call tag_precip(SNOW, wvt_ratio*CL_CC_PASS, SNOW_TR)
+     call tag_precip(RAIN, wvt_ratio*CL_CC_PASS*1000., RAIN_TR)
+     call tag_precip(SNOW, wvt_ratio*CL_CC_PASS*1000., SNOW_TR)
    end if
 
 !print *, "FLAG0004"
@@ -794,7 +794,14 @@ contains
 ! compute energy budget (momentum & energy fluxes and phase changes) 
 
   if (present(wvtflag)) then
-!print *, "FLAG0010"
+if (ILOC .eq. 8 .and. JLOC .eq. 4) then
+!  print *, "FLAG0010, before ENERGY:"
+!  print *, "sum(state):", SMC(1)*100.+SMC(2)*300.+SMC(3)*600.+SMC(4)*1000.+CANLIQ+CANICE+sum(SNICE)+sum(SNLIQ)
+!  print *, "SNEQV,sum(SNICE)+sum(SNLIQ):",SNEQV,sum(SNICE)+sum(SNLIQ)
+!  print *, "RAIN, SNOW:", RAIN*3600., SNOW*3600.
+!  print *, "sum(state_tr):", SMC_TR(1)*100.+SMC_TR(2)*300.+SMC_TR(3)*600.+SMC_TR(4)*1000.+CANLIQ_TR+CANICE_TR+sum(SNICE_TR)+sum(SNLIQ_TR)
+!  print *, "RAIN_TR, SNOW_TR:", RAIN_TR*3600., SNOW_TR*3600.
+end if
     CALL ENERGY (parameters,ICE    ,VEGTYP ,IST    ,NSNOW  ,NSOIL  , & !in
                  ISNOW  ,DT     ,RHOAIR ,SFCPRS ,QAIR   , & !in
                  SFCTMP ,THAIR  ,LWDN   ,UU     ,VV     ,ZLVL   , & !in
@@ -887,7 +894,10 @@ end if
 ! compute water budgets (water storages, ET components, and runoff)
 
    if (present(wvtflag)) then
-!print *, "FLAG0014"
+if (ILOC .eq. 8 .and. JLOC .eq. 4) then
+!  print *, "FLAG0014, before WATER:"
+!  print *, "sum(state):", SMC(1)*100.+SMC(2)*300.+SMC(3)*600.+SMC(4)*1000.+CANLIQ+CANICE+sum(SNICE)+sum(SNLIQ)
+end if
      CALL WATER (parameters,VEGTYP ,NSNOW  ,NSOIL  ,IMELT  ,DT     ,UU     , & !in
                  VV     ,FCEV   ,FCTR   ,QPRECC ,QPRECL ,ELAI   , & !in
                  ESAI   ,SFCTMP ,QVAP   ,QDEW   ,ZSOIL  ,BTRANI , & !in
@@ -924,7 +934,15 @@ end if
 #endif
 
                  )  !out
-!print *, "FLAG0015"   
+if (ILOC .eq. 8 .and. JLOC .eq. 4) then
+!  print *, "FLAG0015, after WATER:"
+!  print *, "sum(state):", SMC(1)*100.+SMC(2)*300.+SMC(3)*600.+SMC(4)*1000.+CANLIQ+CANICE+sum(SNICE)+sum(SNLIQ)
+!  print *, "sum(flux):", PRCP*3600.+sfcheadrt-((ECAN+EDIR+ETRAN)*3600.+RUNSUB*3600.+RUNSRF*3600.)
+!  print *, "SNEQV,sum(SNICE)+sum(SNLIQ):",SNEQV,sum(SNICE)+sum(SNLIQ)
+!  print *, "sum(state_tr):", SMC_TR(1)*100.+SMC_TR(2)*300.+SMC_TR(3)*600.+SMC_TR(4)*1000.+CANLIQ_TR+CANICE_TR+sum(SNICE_TR)+sum(SNLIQ_TR)
+!  print *, "sum(flux_tr):", (RAIN_TR+SNOW_TR)*3600.+sfcheadrt_tr_pass-((ECAN_TR+EDIR_TR+ETRAN_TR)*3600.+RUNSUB_TR*3600.+RUNSRF_TR*3600.)
+!  print *, "SNEQV_TR,sum(SNICE_TR)+sum(SNLIQ_TR):",SNEQV_TR,sum(SNICE_TR)+sum(SNLIQ_TR)
+end if   
    else
 !print *, "FLAG0016"
      CALL WATER (parameters,VEGTYP ,NSNOW  ,NSOIL  ,IMELT  ,DT     ,UU     , & !in
@@ -1402,9 +1420,9 @@ end if
          QTHROR = (1.-FVEG) * RAIN
          CANLIQ=MAX(0.,CANLIQ+QINTR*DT)
 	 ! do tracer calculation---------
-	 if (present(WVTFLAG)) call tag_precip(QINTR, WVT_RATIO*CL_CC_PASS, QINTR_TR)
-	 if (present(WVTFLAG)) call tag_precip(QDRIPR, WVT_RATIO*CL_CC_PASS, QDRIPR_TR)
-	 if (present(WVTFLAG)) call tag_precip(QTHROR, WVT_RATIO*CL_CC_PASS, QTHROR_TR)
+	 if (present(WVTFLAG)) call tag_precip(QINTR, WVT_RATIO*CL_CC_PASS*1000., QINTR_TR)
+	 if (present(WVTFLAG)) call tag_precip(QDRIPR, WVT_RATIO*CL_CC_PASS*1000., QDRIPR_TR)
+	 if (present(WVTFLAG)) call tag_precip(QTHROR, WVT_RATIO*CL_CC_PASS*1000., QTHROR_TR)
 	 if (present(WVTFLAG)) CANLIQ_TR = MAX(0.0, CANLIQ_TR+QINTR_TR*DT)
 	 !-------------------------------
       ELSE
@@ -1452,10 +1470,10 @@ end if
          QTHROS = (1.0-FVEG) * SNOW
          CANICE= MAX(0.,CANICE + (QINTS - ICEDRIP)*DT)
 	 if (present(WVTFLAG)) then     !wt calc
-	   call tag_precip(QINTS, WVT_RATIO*CL_CC_PASS, QINTS_TR)
+	   call tag_precip(QINTS, WVT_RATIO*CL_CC_PASS*1000., QINTS_TR)
 	   ICEDRIP_TR = ICEDRIP*PROPOR_TR
-	   QDRIPS_TR  = FVEG*SNOW*WVT_RATIO*CL_CC_PASS - QINTS_TR + ICEDRIP_TR
-	   call tag_precip(QTHROS, WVT_RATIO*CL_CC_PASS, QTHROS_TR)
+	   QDRIPS_TR  = FVEG*SNOW*WVT_RATIO*CL_CC_PASS*1000. - QINTS_TR + ICEDRIP_TR
+	   call tag_precip(QTHROS, WVT_RATIO*CL_CC_PASS*1000., QTHROS_TR)
 	   CANICE_TR  = MAX(0.,CANICE_TR+(QINTS_TR-ICEDRIP_TR)*DT)
 	 end if
       ELSE
@@ -1465,7 +1483,7 @@ end if
 	 if (present(WVTFLAG)) then  !wt calc
 	   QINTS_TR = 0.0
 	   QDRIPS_TR = 0.0
-	   QTHROS_TR = QTHROS * WVT_RATIO*CL_CC_PASS     !huancui
+	   QTHROS_TR = QTHROS * WVT_RATIO*CL_CC_PASS*1000.     !huancui
 	 end if
 	 IF(CANICE > 0.) THEN             ! FOR CASE OF CANOPY GETTING BURIED
 	   QDRIPS = QDRIPS + CANICE/DT

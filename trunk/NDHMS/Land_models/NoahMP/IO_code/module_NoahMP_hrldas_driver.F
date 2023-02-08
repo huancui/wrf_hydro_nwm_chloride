@@ -2134,7 +2134,11 @@ print *, "NTRACER", NTRACER
 print *, "NTRACER", NTRACER
 !print *, "FLAG8,SFCRUNOFF(28,22):",SFCRUNOFF(28,22)
     else
-!print *, "FLAG9,SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23):",SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23)
+print *, "FLAG9 before noahmplsm"
+print *, "sum(state_tr):", CANICEXY_TR(7,4)+CANLIQXY_TR(7,4)+sum(SNICEXY_TR(7,:,4))+sum(SNLIQXY_TR(7,:,4))+ SMOIS_TR(7,1,4)*100.+SMOIS_TR(7,2,4)*300.+SMOIS_TR(7,3,4)*600.+SMOIS_TR(7,4,4)*1000.
+print *, "sum(state):", CANICEXY(7,4)+CANLIQXY(7,4)+sum(SNICEXY(7,:,4))+sum(SNLIQXY(7,:,4))+SMOIS(7,1,4)*100.+SMOIS(7,2,4)*300.+SMOIS(7,3,4)*600.+SMOIS(7,4,4)*1000.
+print *, "sfcheadrt_tr(7,4),sfcheadrt(7,4):", sfcheadrt_tr(7,4),sfcheadrt(7,4)
+print *, "RAINBL,RAINBL_TR:", RAINBL(7,4),RAINBL_TR(7,4) 
 print *, "NTRACER", NTRACER
          CALL noahmplsm(ITIMESTEP,       YR, JULIAN_IN,   COSZEN, XLAT_URB2D, &
 	           DZ8W,     DTBL,      DZS,     NUM_SOIL_LAYERS,         DX, &
@@ -2199,9 +2203,16 @@ print *, "NTRACER", NTRACER
                 , INFXSRT_TR=INFXSRT_TR, sfcheadrt_tr=sfcheadrt_tr,soldrain_tr=soldrain_tr           &    !O water tracer
 #endif 
                 )
-!print *, "FLAG9-1, SMOIS(44,23,:),SMOIS_SUB(44,23,:),SH2OX(44,23),SH2OXY_SUB(44,23):",SMOIS(44,:,23),SMOIS_SUB(44,:,23),SH2O(44,:,23),SH2OXY_SUB(44,:,23)
-!print *, "FLAG9-1,SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26):",SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26)
-
+print *, "FLAG9-1, after noahmplsm"
+print *, "sum(state_tr):", CANICEXY_TR(7,4)+CANLIQXY_TR(7,4)+sum(SNICEXY_TR(7,:,4))+sum(SNLIQXY_TR(7,:,4))+ SMOIS_TR(7,1,4)*100.+SMOIS_TR(7,2,4)*300.+SMOIS_TR(7,3,4)*600.+SMOIS_TR(7,4,4)*1000.
+print *, "sum(state):", CANICEXY(7,4)+CANLIQXY(7,4)+sum(SNICEXY(7,:,4))+sum(SNLIQXY(7,:,4))+SMOIS(7,1,4)*100.+SMOIS(7,2,4)*300.+SMOIS(7,3,4)*600.+SMOIS(7,4,4)*1000.
+print *, "sfcheadrt_tr(7,4),sfcheadrt(7,4):", sfcheadrt_tr(7,4),sfcheadrt(7,4)
+print *, "RAINBL,RAINBL_TR:", RAINBL(7,4),RAINBL_TR(7,4)
+print *, "sum(flux_tr):", RAINBL_TR(7,4)+sfcheadrt_tr(7,4)-RUNSFXY_TR(7,4)*3600.-RUNSBXY_TR(7,4)*3600.-(ECANXY_TR(7,4)*3600.+EDIRXY_TR(7,4)*3600.+ETRANXY_TR(7,4)*3600.)
+print *, "sum(flux):", RAINBL(7,4)+sfcheadrt(7,4)-RUNSFXY(7,4)*3600.-RUNSBXY(7,4)*3600.-(ECANXY(7,4)*3600.+EDIRXY(7,4)*3600.+ETRANXY(7,4)*3600.)
+print *, "sfcheadrt_tr(7,4),sfcheadrt(7,4):", sfcheadrt_tr(7,4),sfcheadrt(7,4)
+print *, "sum(SMOIS_TR), sum(SMOIS):",SMOIS_TR(7,1,4)*100.+SMOIS_TR(7,2,4)*300.+SMOIS_TR(7,3,4)*600.+SMOIS_TR(7,4,4)*1000.,SMOIS(7,1,4)*100.+SMOIS(7,2,4)*300.+SMOIS(7,3,4)*600.+SMOIS(7,4,4)*1000.
+print *, "sum(CAN+SNOW_TR),sum(CAN+SNOW):",CANICEXY_TR(7,4)+CANLIQXY_TR(7,4)+sum(SNICEXY_TR(7,:,4))+sum(SNLIQXY_TR(7,:,4)),CANICEXY(7,4)+CANLIQXY(7,4)+sum(SNICEXY(7,:,4))+sum(SNLIQXY(7,:,4))
     end if
 
           call system_clock(count=count_after_sflx, count_rate=clock_rate)
@@ -2242,7 +2253,12 @@ print *, "NTRACER", NTRACER
             NTRACER, WVTFLAG=WVTFLAG, SMOIS_SUB=SMOIS_SUB, SH2OXY_SUB=SH2OXY_SUB, &    ! water tracer vars      
             SMOIS_TR=SMOIS_TR, SH2OXY_TR=SH2OXY_TR,              &    ! water tracer vars
             infxsrt_tr=infxsrt_tr, sfcheadrt_tr=sfcheadrt_tr,soldrain_tr=soldrain_tr)  ! water tracer vars
-!print *, "FLAG9-3, SMOIS(44,:,23),SMOIS_SUB(44,:,23),SH2OX(44,:,23),SH2OXY_SUB(44,:,23):",SMOIS(44,:,23),SMOIS_SUB(44,:,23),SH2O(44,:,23),SH2OXY_SUB(44,:,23)
+print *, "FLAG9-3, after hrldas_drv_HYDRO"
+print *, "sum(CAN and SNOW_TR),RAINBL_TR(7,4):", CANICEXY_TR(7,4)+CANLIQXY_TR(7,4)+sum(SNICEXY_TR(7,:,4))+sum(SNLIQXY_TR(7,:,4)),RAINBL_TR(7,4)
+print *, "sum(SMOIS_TR):", SMOIS_TR(7,1,4)*100.+SMOIS_TR(7,2,4)*300.+SMOIS_TR(7,3,4)*600.+SMOIS_TR(7,4,4)*1000.
+print *, "sum(CAN and SNOW),RAINBL(7,4):", CANICEXY(7,4)+CANLIQXY(7,4)+sum(SNICEXY(7,:,4))+sum(SNLIQXY(7,:,4)),RAINBL(7,4)
+print *, "sum(SMOIS):", SMOIS(7,1,4)*100.+SMOIS(7,2,4)*300.+SMOIS(7,3,4)*600.+SMOIS(7,4,4)*1000.
+print *, "sfcheadrt_tr(7,4),sfcheadrt(7,4):", sfcheadrt_tr(7,4),sfcheadrt(7,4)
      end if
 #endif
 
@@ -2332,7 +2348,7 @@ subroutine calculate_raintag(wvt_ratio,xstart,xend,ystart,yend,CL_CC, RAINBL, RA
   do jj = ystart,yend
     do ii = xstart,xend
       write(*,*) "RAINBL(ii,jj),wvt_ratio,CL_CC(ii,jj):",RAINBL(ii,jj),wvt_ratio,CL_CC(ii,jj)
-      RAINBL_TR(ii,jj) = RAINBL(ii,jj)*wvt_ratio*CL_CC(ii,jj)
+      RAINBL_TR(ii,jj) = RAINBL(ii,jj)*wvt_ratio*CL_CC(ii,jj)*1000.0
       ACRAINBL_TR(ii,jj) = ACRAINBL_TR(ii,jj) + RAINBL_TR(ii,jj)
     end do
   end do

@@ -184,8 +184,8 @@ CONTAINS
              RT_DOMAIN(did)%SH2OX_TR    = SH2OX_TR
              RT_DOMAIN(did)%infxsrt_tr  = infxsrt_tr
              RT_DOMAIN(did)%soldrain_tr = soldrain_tr
-!print *, "FLAG 4)001, sfcheadrt(41,27), sfcheadrt_tr(41,27):",sfcheadrt(41,27), sfcheadrt_tr(41,27)
-!print *, "FLAG 4)001, RT_DOMAIN(did)%SMC(44,23,:),RT_DOMAIN(did)%SMC_SUB(44,23,:),RT_DOMAIN(did)%SH2OX(44,23),RT_DOMAIN(did)%SH2OX_SUB(44,23):",RT_DOMAIN(did)%SMC(44,23,:),RT_DOMAIN(did)%SMC_SUB(44,23,:),RT_DOMAIN(did)%SH2OX(44,23,:),RT_DOMAIN(did)%SH2OX_SUB(44,23,:)
+!print *, "FLAG 4)001, before HYDRO_exe"
+!print *, "sfcheadrt_tr(9,3),infxsrt_tr(9,3),soldrain_tr(9,3),RT_DOMAIN(did)%SMC_TR(9,3,:):",sfcheadrt_tr(9,3),infxsrt_tr(9,3),soldrain_tr(9,3),RT_DOMAIN(did)%SMC_TR(9,3,:)
            end if
         end if
            
@@ -201,8 +201,8 @@ CONTAINS
 
 !print *, "FLAG 4)002"
         call HYDRO_exe(did)
-!print *, "FLAG 4)003, sfcheadrt(75,46), sfcheadrt_tr(75,46):",sfcheadrt(75,46), sfcheadrt_tr(75,46)
-!print *, "FLAG 4)003, RT_DOMAIN(did)%SMC(44,23,:),RT_DOMAIN(did)%SMC_SUB(44,23,:),RT_DOMAIN(did)%SH2OX(44,23),RT_DOMAIN(did)%SH2OX_SUB(44,23):",RT_DOMAIN(did)%SMC(44,23,:),RT_DOMAIN(did)%SMC_SUB(44,23,:),RT_DOMAIN(did)%SH2OX(44,23,:),RT_DOMAIN(did)%SH2OX_SUB(44,23,:)
+!print *, "FLAG 4)003, after HYDRO_exe"
+!print *, "RT_DOMAIN(did)%SMC_TR(9,3,:),rt_domain(did)%overland%control%surface_water_head_lsm_tr(9,3),rt_domain(did)%SMCRT_TR(33:36,9:12,:),rt_domain(did)%QSUBRT_TR(33:36,9:12,:):",RT_DOMAIN(did)%SMC_TR(9,3,:),rt_domain(did)%overland%control%surface_water_head_lsm_tr(9,3),rt_domain(did)%SMCRT_TR(33:36,9:12,:),rt_domain(did)%QSUBRT_TR(33:36,9:12,:)
 
 #ifdef MPP_LAND
         if(my_id .eq. IO_id) then
